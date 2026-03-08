@@ -65,6 +65,19 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
+// Default returns a Config with default values for the given agent.
+func Default(agent string) *Config {
+	return &Config{
+		Agent: agent,
+		Root:  DefaultRoot(),
+		Claude: ClaudeConfig{
+			Model:       "claude-opus-4-6",
+			Timeout:     5 * time.Minute,
+			MemoryModel: "claude-sonnet-4-6",
+		},
+	}
+}
+
 // AgentDir returns the full path to the active agent's directory.
 func (c *Config) AgentDir() string {
 	return filepath.Join(c.Root, c.Agent)

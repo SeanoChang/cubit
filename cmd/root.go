@@ -19,6 +19,12 @@ func init() {
 	// cubit version
 	rootCmd.AddCommand(versionCmd)
 
+	// cubit init [agent_name] [--skip-onboard] [--import-identity FILE] [--force]
+	initCmd.Flags().Bool("skip-onboard", false, "Skip interactive LLM onboarding")
+	initCmd.Flags().String("import-identity", "", "Import an existing FLUCTLIGHT.md file")
+	initCmd.Flags().Bool("force", false, "Re-run onboarding for an existing agent")
+	rootCmd.AddCommand(initCmd)
+
 	// cubit config show
 	configCmd.AddCommand(configShowCmd)
 	rootCmd.AddCommand(configCmd)
