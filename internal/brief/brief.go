@@ -104,6 +104,45 @@ func BuildWithUpstream(agentDir string, upstreamIDs []int) string {
 	return base + "\n\n---\n\n" + upstream
 }
 
+// BuildLoopInjection builds the injection for a loop iteration.
+// program is a path relative to agentDir (e.g. "sweep.md"). If empty, no program section.
+// goal is the exit condition string. iteration is the current iteration number.
+// maxIterations is the limit (0 = unlimited).
+func BuildLoopInjection(agentDir, program, goal string, iteration, maxIterations int) string {
+	base := Build(agentDir)
+
+	var extra []string
+
+	// Program file injection
+	if program != "" {
+		content := readFile(filepath.Join(agentDir, program))
+		if content != "" {
+			extra = append(extra, "## Program\n"+content)
+		}
+	}
+
+	// Results context
+	resultsPath := filepath.Join(agentDir, "memory", "results.tsv")
+	if results := readFile(resultsPath); results != "" {
+		extra = append(extra, "## Experiment Results\n```tsv\n"+results+"\n```")
+	}
+
+	// Iteration + goal info
+	iterStr := fmt.Sprintf("Iteration %d", iteration)
+	if maxIterations > 0 {
+		iterStr = fmt.Sprintf("Iteration %d/%d", iteration, maxIterations)
+	}
+
+	goalBlock := iterStr
+	if goal != "" {
+		goalBlock += fmt.Sprintf("\nGoal: %s", goal)
+		goalBlock += "\n\nWhen the goal is met, include the exact string GOAL_MET on its own line in your response."
+	}
+	extra = append(extra, "## Loop Status\n"+goalBlock)
+
+	return base + "\n\n---\n\n" + strings.Join(extra, "\n\n---\n\n")
+}
+
 // EstimateTokens returns a rough token count: word count * 1.3.
 func EstimateTokens(text string) int {
 	return int(float64(len(strings.Fields(text))) * 1.3)

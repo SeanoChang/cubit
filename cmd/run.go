@@ -106,11 +106,16 @@ var runCmd = &cobra.Command{
 				running++
 				fmt.Printf("▶ %03d: %s\n", popped.ID, popped.Title)
 
-				go func(t *queue.Task) {
+				go func(t *queue.Task, nm bool) {
 					defer sem.Release(1)
-					result := executeWithRetry(ctx, t, 3)
+					var result queue.TaskResult
+					if t.Mode == "loop" {
+						result = executeLoop(ctx, t, nm)
+					} else {
+						result = executeWithRetry(ctx, t, 3)
+					}
 					doneCh <- result
-				}(popped)
+				}(popped, noMemory)
 
 				if once {
 					break
@@ -222,9 +227,97 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 	}
 }
 
+// executeLoop runs a loop-mode task: iterate until goal met, max_iterations, or cancellation.
+func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.TaskResult {
+	agentDir := cfg.AgentDir()
+	scratchDir := filepath.Join(agentDir, "scratch")
+
+	model := task.Model
+	if model == "" {
+		model = cfg.Claude.Model
+	}
+
+	maxIter := task.MaxIterations // 0 = unlimited
+
+	for {
+		select {
+		case <-ctx.Done():
+			return queue.TaskResult{
+				TaskID:  task.ID,
+				Summary: "interrupted",
+				Err:     ctx.Err(),
+				Model:   model,
+			}
+		default:
+		}
+
+		iteration := queue.IncrementIteration(scratchDir, task.ID)
+
+		// Check max_iterations
+		if maxIter > 0 && iteration > maxIter {
+			queue.ClearIteration(scratchDir, task.ID)
+			return queue.TaskResult{
+				TaskID:  task.ID,
+				Summary: fmt.Sprintf("max iterations reached (%d)", maxIter),
+				Model:   model,
+			}
+		}
+
+		fmt.Printf("  ↻ %03d: iteration %d", task.ID, iteration)
+		if maxIter > 0 {
+			fmt.Printf("/%d", maxIter)
+		}
+		fmt.Println()
+
+		// Build loop injection
+		injection := brief.BuildLoopInjection(agentDir, task.Program, task.Goal, iteration, maxIter)
+		full := injection + "\n\n---\n\nExecute the next iteration of the active loop task."
+
+		output, err := claude.Prompt(full, model)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  %03d: iteration %d error: %v\n", task.ID, iteration, err)
+			continue // retry next iteration on transient errors
+		}
+
+		// Write output (overwrite each iteration — latest output wins)
+		if writeErr := queue.WriteTaskOutput(scratchDir, task.ID, output); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "  warning: write output %03d: %v\n", task.ID, writeErr)
+		}
+
+		fmt.Printf("\n%s\n\n", output)
+
+		// Memory pass between iterations
+		if !noMemory {
+			if memErr := brief.RunMemoryPass(agentDir, output, cfg.Claude.MemoryModel); memErr != nil {
+				fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", memErr)
+			}
+		}
+
+		// Check goal
+		if task.Goal != "" && queue.GoalMet(output) {
+			queue.ClearIteration(scratchDir, task.ID)
+			return queue.TaskResult{
+				TaskID:  task.ID,
+				Output:  output,
+				Summary: fmt.Sprintf("goal met at iteration %d: %s", iteration, task.Goal),
+				Model:   model,
+			}
+		}
+	}
+}
+
 func handleResult(result queue.TaskResult, noMemory bool) {
 	if result.Err != nil {
 		fmt.Fprintf(os.Stderr, "✗ %03d: %s\n", result.TaskID, result.Err)
+		// Requeue interrupted tasks so they can resume
+		if result.Err == context.Canceled || result.Err == context.DeadlineExceeded {
+			if err := q.RequeueByID(result.TaskID); err != nil {
+				fmt.Fprintf(os.Stderr, "  requeue error %03d: %v\n", result.TaskID, err)
+			} else {
+				fmt.Printf("  ↩ %03d: requeued\n", result.TaskID)
+			}
+			return
+		}
 		if err := q.CompleteByID(result.TaskID, result.Summary); err != nil {
 			fmt.Fprintf(os.Stderr, "  complete error %03d: %v\n", result.TaskID, err)
 		}

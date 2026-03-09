@@ -72,3 +72,41 @@ func TestBuildWithUpstream_NoUpstream(t *testing.T) {
 		t.Error("should not have Upstream Results with no upstream IDs")
 	}
 }
+
+func TestBuildLoopInjection_WithProgram(t *testing.T) {
+	dir := setupBriefTestDir(t)
+	os.WriteFile(filepath.Join(dir, "memory", "brief.md"), []byte("# Brief\nWorking on sweep."), 0o644)
+	os.WriteFile(filepath.Join(dir, "sweep.md"), []byte("# Sweep Program\nRun experiments."), 0o644)
+	os.WriteFile(filepath.Join(dir, "memory", "results.tsv"), []byte("commit\tval_bpb\na1b2\t0.98\n"), 0o644)
+
+	injection := BuildLoopInjection(dir, "sweep.md", "val_bpb < 0.95", 3, 100)
+
+	if !strings.Contains(injection, "Sweep Program") {
+		t.Error("expected program.md content in injection")
+	}
+	if !strings.Contains(injection, "a1b2") {
+		t.Error("expected results.tsv content in injection")
+	}
+	if !strings.Contains(injection, "Iteration 3/100") {
+		t.Error("expected iteration info in injection")
+	}
+	if !strings.Contains(injection, "val_bpb < 0.95") {
+		t.Error("expected goal in injection")
+	}
+	if !strings.Contains(injection, "GOAL_MET") {
+		t.Error("expected GOAL_MET instruction in injection")
+	}
+}
+
+func TestBuildLoopInjection_NoProgram(t *testing.T) {
+	dir := setupBriefTestDir(t)
+
+	injection := BuildLoopInjection(dir, "", "", 1, 0)
+
+	if strings.Contains(injection, "## Program") {
+		t.Error("should not have program section when no program file")
+	}
+	if !strings.Contains(injection, "Iteration 1") {
+		t.Error("expected iteration info")
+	}
+}
