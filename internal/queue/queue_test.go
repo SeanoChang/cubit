@@ -21,7 +21,7 @@ func TestCreateTask(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
 
-	task, err := q.Create("implement FTS5 insert", "")
+	task, err := q.Create("implement FTS5 insert", CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestCreateTaskWithContext(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
 
-	task, err := q.Create("sweep arch", "baseline val_bpb: 0.997")
+	task, err := q.Create("sweep arch", CreateOptions{Context: "baseline val_bpb: 0.997"})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -57,18 +57,76 @@ func TestCreateAutoIncrements(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
 
-	q.Create("first", "")
-	task2, _ := q.Create("second", "")
+	q.Create("first", CreateOptions{})
+	task2, _ := q.Create("second", CreateOptions{})
 	if task2.ID != 2 {
 		t.Errorf("second task ID = %d, want 2", task2.ID)
+	}
+}
+
+func TestCreateWithOptions(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+
+	opts := CreateOptions{
+		Mode:          "loop",
+		DependsOn:     []int{1, 2},
+		Program:       "sweep.md",
+		Goal:          "val_bpb < 0.95",
+		MaxIterations: 50,
+		Branch:        "noah/sweep",
+	}
+	task, err := q.Create("arch sweep", opts)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if task.Mode != "loop" {
+		t.Errorf("Mode = %q, want loop", task.Mode)
+	}
+	if len(task.DependsOn) != 2 || task.DependsOn[0] != 1 || task.DependsOn[1] != 2 {
+		t.Errorf("DependsOn = %v, want [1 2]", task.DependsOn)
+	}
+	if task.Program != "sweep.md" {
+		t.Errorf("Program = %q, want sweep.md", task.Program)
+	}
+	if task.Goal != "val_bpb < 0.95" {
+		t.Errorf("Goal = %q", task.Goal)
+	}
+	if task.MaxIterations != 50 {
+		t.Errorf("MaxIterations = %d, want 50", task.MaxIterations)
+	}
+	if task.Branch != "noah/sweep" {
+		t.Errorf("Branch = %q, want noah/sweep", task.Branch)
+	}
+
+	// Round-trip: read back from disk
+	tasks, err := q.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if tasks[0].Mode != "loop" {
+		t.Errorf("persisted Mode = %q, want loop", tasks[0].Mode)
+	}
+}
+
+func TestCreateDefaultsMode(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+
+	task, err := q.Create("simple task", CreateOptions{})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if task.Mode != "once" {
+		t.Errorf("Mode = %q, want once (default)", task.Mode)
 	}
 }
 
 func TestList(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
-	q.Create("first", "")
-	q.Create("second", "")
+	q.Create("first", CreateOptions{})
+	q.Create("second", CreateOptions{})
 
 	tasks, err := q.List()
 	if err != nil {
@@ -85,8 +143,8 @@ func TestList(t *testing.T) {
 func TestPop(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
-	q.Create("first", "")
-	q.Create("second", "")
+	q.Create("first", CreateOptions{})
+	q.Create("second", CreateOptions{})
 
 	task, err := q.Pop()
 	if err != nil {
@@ -115,8 +173,8 @@ func TestPop(t *testing.T) {
 func TestPopRefusesWhenDoing(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
-	q.Create("first", "")
-	q.Create("second", "")
+	q.Create("first", CreateOptions{})
+	q.Create("second", CreateOptions{})
 
 	q.Pop()
 	_, err := q.Pop()
@@ -138,7 +196,7 @@ func TestPopEmptyQueue(t *testing.T) {
 func TestComplete(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
-	q.Create("first", "")
+	q.Create("first", CreateOptions{})
 	q.Pop()
 
 	err := q.Complete("done with it")
@@ -165,7 +223,7 @@ func TestComplete(t *testing.T) {
 func TestRequeue(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
-	q.Create("first", "")
+	q.Create("first", CreateOptions{})
 	q.Pop()
 
 	err := q.Requeue()
@@ -221,7 +279,7 @@ func TestActiveTask(t *testing.T) {
 	}
 
 	// Pop creates active
-	q.Create("first", "")
+	q.Create("first", CreateOptions{})
 	q.Pop()
 	task, err = q.Active()
 	if err != nil {

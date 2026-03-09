@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/SeanoChang/cubit/internal/queue"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +15,12 @@ var todoCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, _ := cmd.Flags().GetString("context")
 		file, _ := cmd.Flags().GetString("file")
+		mode, _ := cmd.Flags().GetString("mode")
+		dependsOn, _ := cmd.Flags().GetIntSlice("depends-on")
+		program, _ := cmd.Flags().GetString("program")
+		goal, _ := cmd.Flags().GetString("goal")
+		maxIter, _ := cmd.Flags().GetInt("max-iterations")
+		branch, _ := cmd.Flags().GetString("branch")
 
 		if file != "" {
 			data, err := os.ReadFile(file)
@@ -26,7 +33,20 @@ var todoCmd = &cobra.Command{
 			ctx += string(data)
 		}
 
-		task, err := q.Create(args[0], ctx)
+		// IntSlice returns [0] when flag is unset; treat that as empty.
+		if len(dependsOn) == 1 && dependsOn[0] == 0 {
+			dependsOn = nil
+		}
+
+		task, err := q.Create(args[0], queue.CreateOptions{
+			Context:       ctx,
+			Mode:          mode,
+			DependsOn:     dependsOn,
+			Program:       program,
+			Goal:          goal,
+			MaxIterations: maxIter,
+			Branch:        branch,
+		})
 		if err != nil {
 			return err
 		}

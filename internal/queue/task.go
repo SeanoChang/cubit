@@ -12,11 +12,17 @@ import (
 
 // Task represents a single task in the queue.
 type Task struct {
-	ID      int       `yaml:"id"`
-	Status  string    `yaml:"status"`
-	Created time.Time `yaml:"created"`
-	Title   string    `yaml:"-"` // extracted from body
-	Body    string    `yaml:"-"` // markdown body after frontmatter
+	ID            int       `yaml:"id"`
+	Status        string    `yaml:"status"`
+	Created       time.Time `yaml:"created"`
+	Mode          string    `yaml:"mode,omitempty"`
+	DependsOn     []int     `yaml:"depends_on,omitempty"`
+	Program       string    `yaml:"program,omitempty"`
+	Goal          string    `yaml:"goal,omitempty"`
+	MaxIterations int       `yaml:"max_iterations,omitempty"`
+	Branch        string    `yaml:"branch,omitempty"`
+	Title         string    `yaml:"-"` // extracted from body
+	Body          string    `yaml:"-"` // markdown body after frontmatter
 }
 
 // ParseTask parses a task file (YAML frontmatter + markdown body).
@@ -29,6 +35,10 @@ func ParseTask(data []byte) (*Task, error) {
 	var task Task
 	if err := yaml.Unmarshal(parts[1], &task); err != nil {
 		return nil, fmt.Errorf("parsing frontmatter: %w", err)
+	}
+
+	if task.Mode == "" {
+		task.Mode = "once"
 	}
 
 	task.Body = strings.TrimSpace(string(parts[2]))

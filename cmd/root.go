@@ -48,8 +48,16 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 
 	// cubit todo "description" [--context "..."] [-f file.md]
+	//   [--mode once|loop] [--depends-on 1,2] [--program file.md]
+	//   [--goal "expr"] [--max-iterations N] [--branch name]
 	todoCmd.Flags().StringP("context", "c", "", "Inline context to append to task body")
 	todoCmd.Flags().StringP("file", "f", "", "Read context from file")
+	todoCmd.Flags().String("mode", "once", "Execution mode: once or loop")
+	todoCmd.Flags().IntSlice("depends-on", nil, "Comma-separated task IDs this task depends on")
+	todoCmd.Flags().String("program", "", "Program file re-injected each loop iteration")
+	todoCmd.Flags().String("goal", "", "Exit condition for loop mode (agent evaluates)")
+	todoCmd.Flags().Int("max-iterations", 0, "Maximum loop iterations (0 = unlimited)")
+	todoCmd.Flags().String("branch", "", "Git branch for this task (convention, not enforced)")
 	rootCmd.AddCommand(todoCmd)
 
 	// cubit queue

@@ -56,6 +56,66 @@ func TestSerializeTask(t *testing.T) {
 	}
 }
 
+func TestParseTaskWithNewFields(t *testing.T) {
+	raw := `---
+id: 1
+status: pending
+created: 2026-03-09T00:00:00Z
+mode: loop
+depends_on: [2, 3]
+program: sweep.md
+goal: "val_bpb < 0.95"
+max_iterations: 100
+branch: noah/sweep-arch
+---
+
+# Architecture sweep
+`
+	task, err := ParseTask([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseTask: %v", err)
+	}
+	if task.Mode != "loop" {
+		t.Errorf("Mode = %q, want loop", task.Mode)
+	}
+	if len(task.DependsOn) != 2 || task.DependsOn[0] != 2 || task.DependsOn[1] != 3 {
+		t.Errorf("DependsOn = %v, want [2 3]", task.DependsOn)
+	}
+	if task.Program != "sweep.md" {
+		t.Errorf("Program = %q, want sweep.md", task.Program)
+	}
+	if task.Goal != "val_bpb < 0.95" {
+		t.Errorf("Goal = %q, want val_bpb < 0.95", task.Goal)
+	}
+	if task.MaxIterations != 100 {
+		t.Errorf("MaxIterations = %d, want 100", task.MaxIterations)
+	}
+	if task.Branch != "noah/sweep-arch" {
+		t.Errorf("Branch = %q, want noah/sweep-arch", task.Branch)
+	}
+}
+
+func TestParseTaskDefaultsMode(t *testing.T) {
+	raw := `---
+id: 1
+status: pending
+created: 2026-03-09T00:00:00Z
+---
+
+# simple task
+`
+	task, err := ParseTask([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseTask: %v", err)
+	}
+	if task.Mode != "once" {
+		t.Errorf("Mode = %q, want once (default)", task.Mode)
+	}
+	if task.DependsOn != nil {
+		t.Errorf("DependsOn = %v, want nil", task.DependsOn)
+	}
+}
+
 func TestSlugify(t *testing.T) {
 	tests := []struct {
 		in, want string

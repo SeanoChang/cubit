@@ -29,21 +29,43 @@ func GetQueue(agentDir string) *Queue {
 	return instance
 }
 
+// CreateOptions holds optional metadata for a new task.
+type CreateOptions struct {
+	Context       string
+	Mode          string
+	DependsOn     []int
+	Program       string
+	Goal          string
+	MaxIterations int
+	Branch        string
+}
+
 // Create adds a new task to the queue. Returns the created task.
-func (q *Queue) Create(description, context string) (*Task, error) {
+func (q *Queue) Create(description string, opts CreateOptions) (*Task, error) {
 	id := q.nextID()
 
 	body := fmt.Sprintf("# %s", description)
-	if context != "" {
-		body += "\n\n" + context
+	if opts.Context != "" {
+		body += "\n\n" + opts.Context
+	}
+
+	mode := opts.Mode
+	if mode == "" {
+		mode = "once"
 	}
 
 	task := &Task{
-		ID:      id,
-		Status:  "pending",
-		Created: time.Now().UTC().Truncate(time.Second),
-		Title:   description,
-		Body:    strings.TrimSpace(body),
+		ID:            id,
+		Status:        "pending",
+		Created:       time.Now().UTC().Truncate(time.Second),
+		Mode:          mode,
+		DependsOn:     opts.DependsOn,
+		Program:       opts.Program,
+		Goal:          opts.Goal,
+		MaxIterations: opts.MaxIterations,
+		Branch:        opts.Branch,
+		Title:         description,
+		Body:          strings.TrimSpace(body),
 	}
 
 	slug := Slugify(description)
