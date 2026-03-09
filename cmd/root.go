@@ -65,6 +65,9 @@ func init() {
 
 	// cubit log "observation"
 	rootCmd.AddCommand(logCmd)
+
+	// cubit prompt "message"
+	rootCmd.AddCommand(promptCmd)
 }
 
 func Execute() {
