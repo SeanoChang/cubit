@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/SeanoChang/cubit/internal/config"
 	"github.com/SeanoChang/cubit/internal/queue"
@@ -71,6 +72,11 @@ func init() {
 
 	// cubit brief
 	rootCmd.AddCommand(briefCmd)
+
+	// cubit run [--once] [--cooldown 30s]
+	runCmd.Flags().Bool("once", false, "Execute one task then stop")
+	runCmd.Flags().Duration("cooldown", 30*time.Second, "Wait duration between tasks")
+	rootCmd.AddCommand(runCmd)
 }
 
 func Execute() {
