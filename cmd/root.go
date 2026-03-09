@@ -68,6 +68,9 @@ func init() {
 
 	// cubit prompt "message"
 	rootCmd.AddCommand(promptCmd)
+
+	// cubit brief
+	rootCmd.AddCommand(briefCmd)
 }
 
 func Execute() {
