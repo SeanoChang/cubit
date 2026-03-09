@@ -82,7 +82,7 @@ func RunSetup(agentDir, agent string) error {
 		prompt := fmt.Sprintf(onboardingPrompt, agent, conversationStr)
 
 		fmt.Print("Thinking...")
-		response, err := claude.Prompt(prompt)
+		response, err := claude.Prompt(prompt, "")
 		fmt.Print("\r            \r") // clear "Thinking..."
 		if err != nil {
 			if ctx.Err() != nil {
@@ -157,7 +157,7 @@ func generateAndConfirm(ctx context.Context, scanner *bufio.Scanner, path, promp
 			return errInterrupted
 		}
 
-		content, err := claude.Prompt(prompt)
+		content, err := claude.Prompt(prompt, "")
 		if err != nil {
 			if ctx.Err() != nil {
 				return errInterrupted

@@ -10,8 +10,12 @@ import (
 
 // Prompt sends a single-shot prompt to claude CLI and returns the response.
 // Passes the prompt via stdin to avoid arg length limits.
-func Prompt(prompt string) (string, error) {
-	cmd := exec.Command("claude", "-p")
+func Prompt(prompt string, model string) (string, error) {
+	args := []string{"-p"}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	cmd := exec.Command("claude", args...)
 	cmd.Stdin = strings.NewReader(prompt)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
