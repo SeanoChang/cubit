@@ -24,9 +24,9 @@ type GraphNode struct {
 
 // BuildGraph assembles all tasks into an ordered slice of GraphNodes.
 // pending: tasks in queue/*.md
-// active: task in queue/.doing (nil if none)
+// active: tasks currently being worked on (nil if none)
 // done: tasks in queue/done/*.md (nil if none)
-func BuildGraph(pending []*Task, active *Task, done []*Task) []*GraphNode {
+func BuildGraph(pending []*Task, active []*Task, done []*Task) []*GraphNode {
 	doneIDs := make(map[int]bool)
 	for _, t := range done {
 		doneIDs[t.ID] = true
@@ -38,8 +38,8 @@ func BuildGraph(pending []*Task, active *Task, done []*Task) []*GraphNode {
 		nodes = append(nodes, &GraphNode{Task: t, Status: StatusDone})
 	}
 
-	if active != nil {
-		nodes = append(nodes, &GraphNode{Task: active, Status: StatusActive})
+	for _, t := range active {
+		nodes = append(nodes, &GraphNode{Task: t, Status: StatusActive})
 	}
 
 	for _, t := range pending {
@@ -240,6 +240,46 @@ func statusSymbol(s NodeStatus) string {
 	default:
 		return ""
 	}
+}
+
+// ReadyNodes returns all pending tasks whose dependencies are fully satisfied
+// and that are not currently active. Sorted by task ID.
+func ReadyNodes(pending []*Task, active []*Task, done []*Task) []*Task {
+	doneIDs := make(map[int]bool, len(done))
+	for _, t := range done {
+		doneIDs[t.ID] = true
+	}
+	activeIDs := make(map[int]bool, len(active))
+	for _, t := range active {
+		activeIDs[t.ID] = true
+	}
+
+	var ready []*Task
+	for _, t := range pending {
+		if activeIDs[t.ID] {
+			continue
+		}
+		allDone := true
+		for _, dep := range t.DependsOn {
+			if !doneIDs[dep] {
+				allDone = false
+				break
+			}
+		}
+		if allDone {
+			ready = append(ready, t)
+		}
+	}
+
+	sort.Slice(ready, func(i, j int) bool {
+		return ready[i].ID < ready[j].ID
+	})
+	return ready
+}
+
+// GraphComplete returns true when there are no pending or active tasks.
+func GraphComplete(pending []*Task, active []*Task, done []*Task) bool {
+	return len(pending) == 0 && len(active) == 0
 }
 
 // DetectCycle checks for circular dependencies using DFS coloring.

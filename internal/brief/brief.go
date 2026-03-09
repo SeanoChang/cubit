@@ -1,3 +1,4 @@
+// Package brief assembles the session brief from agent files and provides utilities
 package brief
 
 import (
@@ -5,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -28,8 +30,6 @@ func Build(agentDir string) string {
 		{"USER.md", ""},
 		{"GOALS.md", ""},
 		{"memory/brief.md", ""},
-		{"queue/.doing", "## Active Task\n"},
-		{"scratch/plan.md", "## Current Plan\n"},
 	}
 
 	for _, e := range entries {
@@ -51,7 +51,57 @@ func Build(agentDir string) string {
 		parts = append(parts, content)
 	}
 
+	// Active tasks from .doing/ directory
+	doingDir := filepath.Join(agentDir, "queue", ".doing")
+	doingFiles, _ := filepath.Glob(filepath.Join(doingDir, "*.md"))
+	sort.Strings(doingFiles)
+	if len(doingFiles) > 0 {
+		var taskParts []string
+		for _, f := range doingFiles {
+			content := readFile(f)
+			if content != "" {
+				taskParts = append(taskParts, content)
+			}
+		}
+		if len(taskParts) > 0 {
+			active := "## Active Tasks\n" + strings.Join(taskParts, "\n\n")
+			parts = append(parts, active)
+		}
+	}
+
+	// Current plan
+	if plan := readFile(filepath.Join(agentDir, "scratch", "plan.md")); plan != "" {
+		parts = append(parts, "## Current Plan\n"+plan)
+	}
+
 	return strings.Join(parts, "\n\n---\n\n")
+}
+
+// BuildWithUpstream builds the session brief and appends upstream output paths
+// for fan-in nodes. upstreamIDs are task IDs whose outputs should be referenced.
+func BuildWithUpstream(agentDir string, upstreamIDs []int) string {
+	base := Build(agentDir)
+
+	if len(upstreamIDs) == 0 {
+		return base
+	}
+
+	var paths []string
+	for _, id := range upstreamIDs {
+		filename := fmt.Sprintf("%03d-output.md", id)
+		relPath := filepath.Join("scratch", filename)
+		absPath := filepath.Join(agentDir, relPath)
+		if _, err := os.Stat(absPath); err == nil {
+			paths = append(paths, "- "+relPath)
+		}
+	}
+
+	if len(paths) == 0 {
+		return base
+	}
+
+	upstream := "## Upstream Results\n" + strings.Join(paths, "\n")
+	return base + "\n\n---\n\n" + upstream
 }
 
 // EstimateTokens returns a rough token count: word count * 1.3.
@@ -69,8 +119,6 @@ func Sections(agentDir string) []Section {
 		{"USER.md", "USER"},
 		{"GOALS.md", "GOALS"},
 		{"memory/brief.md", "Brief"},
-		{"queue/.doing", "Active Task"},
-		{"scratch/plan.md", "Current Plan"},
 	}
 
 	var sections []Section
@@ -81,6 +129,29 @@ func Sections(agentDir string) []Section {
 			Content: content,
 		})
 	}
+
+	// Active tasks from .doing/ directory
+	doingDir := filepath.Join(agentDir, "queue", ".doing")
+	doingFiles, _ := filepath.Glob(filepath.Join(doingDir, "*.md"))
+	sort.Strings(doingFiles)
+	var activeContent string
+	for _, f := range doingFiles {
+		content := readFile(f)
+		if content != "" {
+			if activeContent != "" {
+				activeContent += "\n\n"
+			}
+			activeContent += content
+		}
+	}
+	sections = append(sections, Section{Label: "Active Tasks", Content: activeContent})
+
+	// Current plan
+	sections = append(sections, Section{
+		Label:   "Current Plan",
+		Content: readFile(filepath.Join(agentDir, "scratch", "plan.md")),
+	})
+
 	return sections
 }
 

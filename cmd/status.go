@@ -13,25 +13,24 @@ var statusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Agent:   %s\n", cfg.Agent)
 
-		// Active task
 		active, err := q.Active()
 		if err != nil {
 			return err
 		}
-		if active != nil {
-			fmt.Printf("Active:  %03d — %s\n", active.ID, active.Title)
+		if len(active) > 0 {
+			for _, t := range active {
+				fmt.Printf("Active:  %03d — %s\n", t.ID, t.Title)
+			}
 		} else {
 			fmt.Println("Active:  (none)")
 		}
 
-		// Queue depth
 		tasks, err := q.List()
 		if err != nil {
 			return err
 		}
 		fmt.Printf("Queue:   %d pending\n", len(tasks))
 
-		// Brief and injection sizes
 		sections := brief.Sections(cfg.AgentDir())
 		total := 0
 		var briefContent string

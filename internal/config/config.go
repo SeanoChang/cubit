@@ -20,6 +20,7 @@ type ClaudeConfig struct {
 	Timeout         time.Duration `yaml:"timeout"          mapstructure:"timeout"`
 	MemoryModel     string        `yaml:"memory_model"     mapstructure:"memory_model"`
 	RefreshJournals int           `yaml:"refresh_journals" mapstructure:"refresh_journals"`
+	MaxParallel     int           `yaml:"max_parallel"     mapstructure:"max_parallel"`
 }
 
 func DefaultRoot() string {
@@ -40,6 +41,7 @@ func Load() (*Config, error) {
 	v.SetDefault("claude.timeout", "5m")
 	v.SetDefault("claude.memory_model", "claude-sonnet-4-6")
 	v.SetDefault("claude.refresh_journals", 5)
+	v.SetDefault("claude.max_parallel", 0)
 
 	// Config file location
 	root := DefaultRoot()
@@ -77,6 +79,7 @@ func Default(agent string) *Config {
 			Timeout:         5 * time.Minute,
 			MemoryModel:     "claude-sonnet-4-6",
 			RefreshJournals: 5,
+			MaxParallel:     0,
 		},
 	}
 }

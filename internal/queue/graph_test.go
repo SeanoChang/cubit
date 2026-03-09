@@ -9,7 +9,7 @@ func TestBuildGraph_AllStatuses(t *testing.T) {
 	done := []*Task{
 		{ID: 1, Title: "arch sweep", Mode: "loop", Status: "done", DependsOn: []int{}},
 	}
-	active := &Task{ID: 2, Title: "ablation", Mode: "loop", Status: "doing", DependsOn: []int{1}}
+	active := []*Task{{ID: 2, Title: "ablation", Mode: "loop", Status: "doing", DependsOn: []int{1}}}
 	pending := []*Task{
 		{ID: 3, Title: "write report", Mode: "once", Status: "pending", DependsOn: []int{1}},
 		{ID: 4, Title: "publish", Mode: "once", Status: "pending", DependsOn: []int{2, 3}},
@@ -57,7 +57,7 @@ func TestBuildGraph_OrderByID(t *testing.T) {
 	done := []*Task{
 		{ID: 10, Title: "last done", Mode: "once", Status: "done", DependsOn: []int{}},
 	}
-	active := &Task{ID: 5, Title: "mid active", Mode: "once", Status: "doing", DependsOn: []int{}}
+	active := []*Task{{ID: 5, Title: "mid active", Mode: "once", Status: "doing", DependsOn: []int{}}}
 	pending := []*Task{
 		{ID: 20, Title: "high pending", Mode: "once", Status: "pending", DependsOn: []int{}},
 		{ID: 1, Title: "low pending", Mode: "once", Status: "pending", DependsOn: []int{}},
@@ -86,7 +86,7 @@ func TestBuildGraph_EmptyGraph(t *testing.T) {
 }
 
 func TestBuildGraph_WaitingOnActive(t *testing.T) {
-	active := &Task{ID: 1, Title: "active task", Mode: "once", Status: "doing", DependsOn: []int{}}
+	active := []*Task{{ID: 1, Title: "active task", Mode: "once", Status: "doing", DependsOn: []int{}}}
 	pending := []*Task{
 		{ID: 2, Title: "depends on active", Mode: "once", Status: "pending", DependsOn: []int{1}},
 	}
@@ -105,6 +105,125 @@ func TestBuildGraph_WaitingOnActive(t *testing.T) {
 		if n.Status != wantStatus[n.Task.ID] {
 			t.Errorf("node %d: status = %q, want %q", n.Task.ID, n.Status, wantStatus[n.Task.ID])
 		}
+	}
+}
+
+func TestBuildGraph_MultipleActive(t *testing.T) {
+	done := []*Task{
+		{ID: 1, Title: "setup", Mode: "once", Status: "done", DependsOn: []int{}},
+	}
+	active := []*Task{
+		{ID: 2, Title: "task a", Mode: "once", Status: "doing", DependsOn: []int{1}},
+		{ID: 3, Title: "task b", Mode: "once", Status: "doing", DependsOn: []int{1}},
+	}
+	pending := []*Task{
+		{ID: 4, Title: "merge", Mode: "once", Status: "pending", DependsOn: []int{2, 3}},
+	}
+
+	nodes := BuildGraph(pending, active, done)
+
+	want := map[int]NodeStatus{
+		1: StatusDone,
+		2: StatusActive,
+		3: StatusActive,
+		4: StatusWaiting,
+	}
+	if len(nodes) != 4 {
+		t.Fatalf("want 4 nodes, got %d", len(nodes))
+	}
+	for _, n := range nodes {
+		if n.Status != want[n.Task.ID] {
+			t.Errorf("node %d: status = %q, want %q", n.Task.ID, n.Status, want[n.Task.ID])
+		}
+	}
+}
+
+func TestReadyNodes_BasicDAG(t *testing.T) {
+	done := []*Task{
+		{ID: 1, Title: "setup", Mode: "once", Status: "done", DependsOn: []int{}},
+	}
+	active := []*Task{
+		{ID: 2, Title: "running", Mode: "once", Status: "doing", DependsOn: []int{1}},
+	}
+	pending := []*Task{
+		{ID: 3, Title: "also ready", Mode: "once", Status: "pending", DependsOn: []int{1}},
+		{ID: 4, Title: "waiting", Mode: "once", Status: "pending", DependsOn: []int{2, 3}},
+	}
+
+	ready := ReadyNodes(pending, active, done)
+
+	if len(ready) != 1 {
+		t.Fatalf("want 1 ready node, got %d", len(ready))
+	}
+	if ready[0].ID != 3 {
+		t.Errorf("ready[0].ID = %d, want 3", ready[0].ID)
+	}
+}
+
+func TestReadyNodes_MultipleFanOut(t *testing.T) {
+	done := []*Task{
+		{ID: 1, Title: "root", Mode: "once", Status: "done", DependsOn: []int{}},
+	}
+	pending := []*Task{
+		{ID: 2, Title: "branch a", Mode: "once", Status: "pending", DependsOn: []int{1}},
+		{ID: 3, Title: "branch b", Mode: "once", Status: "pending", DependsOn: []int{1}},
+		{ID: 4, Title: "branch c", Mode: "once", Status: "pending", DependsOn: []int{1}},
+	}
+
+	ready := ReadyNodes(pending, nil, done)
+
+	if len(ready) != 3 {
+		t.Fatalf("want 3 ready nodes, got %d", len(ready))
+	}
+}
+
+func TestReadyNodes_NoDeps(t *testing.T) {
+	pending := []*Task{
+		{ID: 1, Title: "a", Mode: "once", Status: "pending", DependsOn: []int{}},
+		{ID: 2, Title: "b", Mode: "once", Status: "pending", DependsOn: []int{}},
+	}
+
+	ready := ReadyNodes(pending, nil, nil)
+	if len(ready) != 2 {
+		t.Fatalf("want 2 ready, got %d", len(ready))
+	}
+}
+
+func TestReadyNodes_Empty(t *testing.T) {
+	ready := ReadyNodes(nil, nil, nil)
+	if len(ready) != 0 {
+		t.Fatalf("want 0 ready, got %d", len(ready))
+	}
+}
+
+func TestGraphComplete_AllDone(t *testing.T) {
+	done := []*Task{
+		{ID: 1, Status: "done"},
+		{ID: 2, Status: "done"},
+	}
+	if !GraphComplete(nil, nil, done) {
+		t.Error("expected complete when all done and nothing pending/active")
+	}
+}
+
+func TestGraphComplete_StillPending(t *testing.T) {
+	done := []*Task{{ID: 1, Status: "done"}}
+	pending := []*Task{{ID: 2, Status: "pending", DependsOn: []int{1}}}
+	if GraphComplete(pending, nil, done) {
+		t.Error("expected not complete with pending tasks")
+	}
+}
+
+func TestGraphComplete_StillActive(t *testing.T) {
+	active := []*Task{{ID: 1, Status: "doing"}}
+	if GraphComplete(nil, active, nil) {
+		t.Error("expected not complete with active tasks")
+	}
+}
+
+func TestGraphComplete_EmptyGraph(t *testing.T) {
+	if !GraphComplete(nil, nil, nil) {
+		t.Error("empty graph should be complete")
 	}
 }
 

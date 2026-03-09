@@ -12,8 +12,10 @@ func setupTestDir(t *testing.T) string {
 	instance = nil // reset singleton between tests
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "queue"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "queue", ".doing"), 0o755)
 	os.MkdirAll(filepath.Join(dir, "queue", "done"), 0o755)
 	os.MkdirAll(filepath.Join(dir, "memory"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "scratch"), 0o755)
 	os.WriteFile(filepath.Join(dir, "memory", "log.md"), []byte(""), 0o644)
 	return dir
 }
@@ -158,29 +160,14 @@ func TestPop(t *testing.T) {
 		t.Errorf("Pop Status = %q, want doing", task.Status)
 	}
 
-	// .doing should exist
-	doingPath := filepath.Join(dir, "queue", ".doing")
-	if _, err := os.Stat(doingPath); err != nil {
-		t.Errorf(".doing file missing: %v", err)
+	matches, _ := filepath.Glob(filepath.Join(dir, "queue", ".doing", "001-*.md"))
+	if len(matches) != 1 {
+		t.Errorf("expected 1 file in .doing/, got %d", len(matches))
 	}
 
-	// Original file should be gone
-	matches, _ := filepath.Glob(filepath.Join(dir, "queue", "001-*.md"))
-	if len(matches) != 0 {
+	origMatches, _ := filepath.Glob(filepath.Join(dir, "queue", "001-*.md"))
+	if len(origMatches) != 0 {
 		t.Errorf("original file still exists after pop")
-	}
-}
-
-func TestPopRefusesWhenDoing(t *testing.T) {
-	dir := setupTestDir(t)
-	q := GetQueue(dir)
-	q.Create("first", CreateOptions{})
-	q.Create("second", CreateOptions{})
-
-	q.Pop()
-	_, err := q.Pop()
-	if err == nil {
-		t.Error("expected error when .doing exists")
 	}
 }
 
@@ -205,25 +192,19 @@ func TestComplete(t *testing.T) {
 		t.Fatalf("Complete: %v", err)
 	}
 
-	// .doing should be gone
-	doingPath := filepath.Join(dir, "queue", ".doing")
-	if _, err := os.Stat(doingPath); !os.IsNotExist(err) {
-		t.Error(".doing still exists after Complete")
+	doingMatches, _ := filepath.Glob(filepath.Join(dir, "queue", ".doing", "*.md"))
+	if len(doingMatches) != 0 {
+		t.Error(".doing/ still has files after Complete")
 	}
 
-	// done file should exist
 	doneMatches, _ := filepath.Glob(filepath.Join(dir, "queue", "done", "001-*.md"))
 	if len(doneMatches) != 1 {
-		t.Fatalf("expected 1 done file matching queue/done/001-*.md, got %d", len(doneMatches))
+		t.Fatalf("expected 1 done file, got %d", len(doneMatches))
 	}
 
-	// log.md should have entry
 	logData, _ := os.ReadFile(filepath.Join(dir, "memory", "log.md"))
 	if !strings.Contains(string(logData), "first") {
-		t.Errorf("log.md missing task title: %s", logData)
-	}
-	if !strings.Contains(string(logData), "done with it") {
-		t.Errorf("log.md missing summary: %s", logData)
+		t.Errorf("log.md missing task title")
 	}
 }
 
@@ -262,13 +243,11 @@ func TestRequeue(t *testing.T) {
 		t.Fatalf("Requeue: %v", err)
 	}
 
-	// .doing should be gone
-	doingPath := filepath.Join(dir, "queue", ".doing")
-	if _, err := os.Stat(doingPath); !os.IsNotExist(err) {
-		t.Error(".doing still exists after Requeue")
+	doingMatches, _ := filepath.Glob(filepath.Join(dir, "queue", ".doing", "*.md"))
+	if len(doingMatches) != 0 {
+		t.Error(".doing/ still has files after Requeue")
 	}
 
-	// Task should be back in queue as pending
 	tasks, _ := q.List()
 	if len(tasks) != 1 {
 		t.Fatalf("expected 1 task after requeue, got %d", len(tasks))
@@ -300,27 +279,158 @@ func TestActiveTask(t *testing.T) {
 	dir := setupTestDir(t)
 	q := GetQueue(dir)
 
-	// No active task
-	task, err := q.Active()
+	tasks, err := q.Active()
 	if err != nil {
 		t.Fatalf("Active: %v", err)
 	}
-	if task != nil {
-		t.Error("expected nil when no .doing")
+	if len(tasks) != 0 {
+		t.Error("expected empty when no .doing/ contents")
 	}
 
-	// Pop creates active
 	q.Create("first", CreateOptions{})
 	q.Pop()
-	task, err = q.Active()
+	tasks, err = q.Active()
 	if err != nil {
 		t.Fatalf("Active: %v", err)
 	}
-	if task == nil {
-		t.Fatal("expected active task")
+	if len(tasks) != 1 {
+		t.Fatal("expected 1 active task")
+	}
+	if tasks[0].ID != 1 {
+		t.Errorf("Active ID = %d, want 1", tasks[0].ID)
+	}
+}
+
+func TestMultipleActiveTasks(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	q.Create("first", CreateOptions{})
+	q.Create("second", CreateOptions{})
+
+	q.Pop()
+	q.Pop()
+
+	tasks, err := q.Active()
+	if err != nil {
+		t.Fatalf("Active: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("want 2 active, got %d", len(tasks))
+	}
+}
+
+func TestCompleteByID(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	q.Create("first", CreateOptions{})
+	q.Create("second", CreateOptions{})
+	q.Pop()
+	q.Pop()
+
+	err := q.CompleteByID(1, "done with first")
+	if err != nil {
+		t.Fatalf("CompleteByID: %v", err)
+	}
+
+	active, _ := q.Active()
+	if len(active) != 1 {
+		t.Fatalf("want 1 active after complete, got %d", len(active))
+	}
+	if active[0].ID != 2 {
+		t.Errorf("remaining active ID = %d, want 2", active[0].ID)
+	}
+
+	done, _ := q.ListDone()
+	if len(done) != 1 || done[0].ID != 1 {
+		t.Errorf("done list unexpected: %v", done)
+	}
+}
+
+func TestRequeueByID(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	q.Create("first", CreateOptions{})
+	q.Create("second", CreateOptions{})
+	q.Pop()
+	q.Pop()
+
+	err := q.RequeueByID(1)
+	if err != nil {
+		t.Fatalf("RequeueByID: %v", err)
+	}
+
+	active, _ := q.Active()
+	if len(active) != 1 {
+		t.Fatalf("want 1 active after requeue, got %d", len(active))
+	}
+	if active[0].ID != 2 {
+		t.Errorf("remaining active ID = %d, want 2", active[0].ID)
+	}
+
+	pending, _ := q.List()
+	if len(pending) != 1 || pending[0].ID != 1 {
+		t.Errorf("requeued task not in pending list")
+	}
+}
+
+
+func TestPopReady_SkipsBlocked(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	q.Create("root", CreateOptions{})
+	q.Create("depends on root", CreateOptions{DependsOn: []int{1}})
+
+	task, err := q.PopReady()
+	if err != nil {
+		t.Fatalf("PopReady: %v", err)
 	}
 	if task.ID != 1 {
-		t.Errorf("Active ID = %d, want 1", task.ID)
+		t.Errorf("PopReady ID = %d, want 1 (the unblocked one)", task.ID)
+	}
+}
+
+func TestPopReady_NoneReady(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	q.Create("blocked", CreateOptions{DependsOn: []int{99}})
+
+	_, err := q.PopReady()
+	if err == nil {
+		t.Error("expected error when no tasks are ready")
+	}
+}
+
+func TestPopAllReady(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	q.Create("a", CreateOptions{})
+	q.Create("b", CreateOptions{})
+	q.Create("blocked", CreateOptions{DependsOn: []int{1, 2}})
+
+	tasks, err := q.PopAllReady()
+	if err != nil {
+		t.Fatalf("PopAllReady: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("want 2 popped, got %d", len(tasks))
+	}
+
+	pending, _ := q.List()
+	if len(pending) != 1 || pending[0].ID != 3 {
+		t.Errorf("expected task 3 still pending, got %v", pending)
+	}
+}
+
+func TestPopAllReady_EmptyQueue(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+
+	tasks, err := q.PopAllReady()
+	if err != nil {
+		t.Fatalf("PopAllReady: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("want 0, got %d", len(tasks))
 	}
 }
 

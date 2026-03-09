@@ -12,8 +12,9 @@ import (
 
 // Queue manages task files in an agent's queue/ directory.
 type Queue struct {
-	queueDir string // path to queue/
-	logPath  string // path to memory/log.md
+	queueDir   string // path to queue/
+	scratchDir string // path to scratch/
+	logPath    string // path to memory/log.md
 }
 
 var instance *Queue
@@ -21,9 +22,14 @@ var instance *Queue
 // GetQueue returns the singleton Queue, initializing it on first call.
 func GetQueue(agentDir string) *Queue {
 	if instance == nil {
+		qDir := filepath.Join(agentDir, "queue")
 		instance = &Queue{
-			queueDir: filepath.Join(agentDir, "queue"),
-			logPath:  filepath.Join(agentDir, "memory", "log.md"),
+			queueDir:   qDir,
+			scratchDir: filepath.Join(agentDir, "scratch"),
+			logPath:    filepath.Join(agentDir, "memory", "log.md"),
+		}
+		if err := os.MkdirAll(filepath.Join(qDir, ".doing"), 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: creating .doing/ dir: %v\n", err)
 		}
 	}
 	return instance
@@ -130,13 +136,8 @@ func (q *Queue) ListDone() ([]*Task, error) {
 	return tasks, nil
 }
 
-// Pop moves the lowest-ID pending task to .doing. Returns the task.
+// Pop moves the lowest-ID pending task to .doing/ directory. Returns the task.
 func (q *Queue) Pop() (*Task, error) {
-	doingPath := filepath.Join(q.queueDir, ".doing")
-	if _, err := os.Stat(doingPath); err == nil {
-		return nil, fmt.Errorf("a task is already active (see .doing)")
-	}
-
 	entries, err := filepath.Glob(filepath.Join(q.queueDir, "*.md"))
 	if err != nil {
 		return nil, err
@@ -154,8 +155,10 @@ func (q *Queue) Pop() (*Task, error) {
 		}
 
 		task.Status = "doing"
+		filename := filepath.Base(path)
+		doingPath := filepath.Join(q.queueDir, ".doing", filename)
 		if err := os.WriteFile(doingPath, task.Serialize(), 0o644); err != nil {
-			return nil, fmt.Errorf("writing .doing: %w", err)
+			return nil, fmt.Errorf("writing to .doing/: %w", err)
 		}
 		if err := os.Remove(path); err != nil {
 			return nil, fmt.Errorf("removing original task file: %w", err)
@@ -166,27 +169,143 @@ func (q *Queue) Pop() (*Task, error) {
 	return nil, fmt.Errorf("queue is empty")
 }
 
-// Active returns the currently active task, or nil if none.
-func (q *Queue) Active() (*Task, error) {
-	doingPath := filepath.Join(q.queueDir, ".doing")
-	data, err := os.ReadFile(doingPath)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
+// PopReady pops the lowest-ID pending task whose dependencies are all done.
+func (q *Queue) PopReady() (*Task, error) {
+	pending, err := q.List()
 	if err != nil {
 		return nil, err
 	}
-	return ParseTask(data)
+	active, err := q.Active()
+	if err != nil {
+		return nil, err
+	}
+	done, err := q.ListDone()
+	if err != nil {
+		return nil, err
+	}
+
+	ready := ReadyNodes(pending, active, done)
+	if len(ready) == 0 {
+		return nil, fmt.Errorf("no ready tasks")
+	}
+
+	return q.popByID(ready[0].ID)
 }
 
-// Complete finishes the active task and appends to log.md.
-func (q *Queue) Complete(summary string) error {
-	task, err := q.Active()
+// PopAllReady pops all pending tasks whose dependencies are all done.
+func (q *Queue) PopAllReady() ([]*Task, error) {
+	pending, err := q.List()
+	if err != nil {
+		return nil, err
+	}
+	active, err := q.Active()
+	if err != nil {
+		return nil, err
+	}
+	done, err := q.ListDone()
+	if err != nil {
+		return nil, err
+	}
+
+	ready := ReadyNodes(pending, active, done)
+	var popped []*Task
+	for _, t := range ready {
+		task, err := q.popByID(t.ID)
+		if err != nil {
+			return popped, err
+		}
+		popped = append(popped, task)
+	}
+	return popped, nil
+}
+
+// popByID moves a specific pending task into .doing/.
+func (q *Queue) popByID(id int) (*Task, error) {
+	pattern := fmt.Sprintf("%03d-*.md", id)
+	matches, err := filepath.Glob(filepath.Join(q.queueDir, pattern))
+	if err != nil {
+		return nil, err
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("task %03d not found in queue", id)
+	}
+
+	path := matches[0]
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	task, err := ParseTask(data)
+	if err != nil {
+		return nil, err
+	}
+
+	task.Status = "doing"
+	filename := filepath.Base(path)
+	doingPath := filepath.Join(q.queueDir, ".doing", filename)
+	if err := os.WriteFile(doingPath, task.Serialize(), 0o644); err != nil {
+		return nil, fmt.Errorf("writing to .doing/: %w", err)
+	}
+	if err := os.Remove(path); err != nil {
+		return nil, fmt.Errorf("removing original: %w", err)
+	}
+	return task, nil
+}
+
+// Active returns all currently active tasks in .doing/ directory.
+func (q *Queue) Active() ([]*Task, error) {
+	doingDir := filepath.Join(q.queueDir, ".doing")
+	entries, err := filepath.Glob(filepath.Join(doingDir, "*.md"))
+	if err != nil {
+		return nil, err
+	}
+
+	var tasks []*Task
+	for _, path := range entries {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		task, err := ParseTask(data)
+		if err != nil {
+			continue
+		}
+		tasks = append(tasks, task)
+	}
+
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].ID < tasks[j].ID
+	})
+	return tasks, nil
+}
+
+// findActiveByID finds an active task by its ID in the .doing/ directory.
+func (q *Queue) findActiveByID(id int) (string, *Task, error) {
+	doingDir := filepath.Join(q.queueDir, ".doing")
+	pattern := fmt.Sprintf("%03d-*.md", id)
+	matches, err := filepath.Glob(filepath.Join(doingDir, pattern))
+	if err != nil {
+		return "", nil, err
+	}
+	if len(matches) == 0 {
+		return "", nil, fmt.Errorf("no active task with ID %d", id)
+	}
+	data, err := os.ReadFile(matches[0])
+	if err != nil {
+		return "", nil, err
+	}
+	task, err := ParseTask(data)
+	if err != nil {
+		return "", nil, err
+	}
+	return matches[0], task, nil
+}
+
+// CompleteByID finishes a specific active task by ID and appends to log.md.
+func (q *Queue) CompleteByID(id int, summary string) error {
+	path, task, err := q.findActiveByID(id)
 	if err != nil {
 		return err
-	}
-	if task == nil {
-		return fmt.Errorf("no active task")
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -194,7 +313,6 @@ func (q *Queue) Complete(summary string) error {
 		summary = "completed"
 	}
 	entry := fmt.Sprintf("\n## %s — %s [task:%03d]\n%s\n", now, task.Title, task.ID, summary)
-
 	if err := q.appendLog(entry); err != nil {
 		return err
 	}
@@ -210,29 +328,59 @@ func (q *Queue) Complete(summary string) error {
 		return fmt.Errorf("writing done task: %w", err)
 	}
 
-	return os.Remove(filepath.Join(q.queueDir, ".doing"))
+	return os.Remove(path)
 }
 
-// Requeue returns the active task to the queue as pending.
-func (q *Queue) Requeue() error {
-	task, err := q.Active()
+// RequeueByID returns a specific active task by ID to the queue as pending.
+func (q *Queue) RequeueByID(id int) error {
+	path, task, err := q.findActiveByID(id)
 	if err != nil {
 		return err
-	}
-	if task == nil {
-		return fmt.Errorf("no active task")
 	}
 
 	task.Status = "pending"
 	slug := Slugify(task.Title)
 	filename := fmt.Sprintf("%03d-%s.md", task.ID, slug)
-	path := filepath.Join(q.queueDir, filename)
+	pendingPath := filepath.Join(q.queueDir, filename)
 
-	if err := os.WriteFile(path, task.Serialize(), 0o644); err != nil {
+	if err := os.WriteFile(pendingPath, task.Serialize(), 0o644); err != nil {
 		return err
 	}
-	return os.Remove(filepath.Join(q.queueDir, ".doing"))
+	return os.Remove(path)
 }
+
+// Complete finishes the active task and appends to log.md.
+// Errors if multiple tasks are active — use CompleteByID instead.
+func (q *Queue) Complete(summary string) error {
+	tasks, err := q.Active()
+	if err != nil {
+		return err
+	}
+	if len(tasks) == 0 {
+		return fmt.Errorf("no active task")
+	}
+	if len(tasks) > 1 {
+		return fmt.Errorf("multiple active tasks — use CompleteByID(id, summary)")
+	}
+	return q.CompleteByID(tasks[0].ID, summary)
+}
+
+// Requeue returns the active task to the queue as pending.
+// Errors if multiple tasks are active — use RequeueByID instead.
+func (q *Queue) Requeue() error {
+	tasks, err := q.Active()
+	if err != nil {
+		return err
+	}
+	if len(tasks) == 0 {
+		return fmt.Errorf("no active task")
+	}
+	if len(tasks) > 1 {
+		return fmt.Errorf("multiple active tasks — use RequeueByID(id)")
+	}
+	return q.RequeueByID(tasks[0].ID)
+}
+
 
 // Log appends a free-form observation to log.md.
 func (q *Queue) Log(note string) error {
@@ -270,10 +418,11 @@ func (q *Queue) ValidateDependencies(newID int, deps []int) error {
 	if err != nil {
 		return err
 	}
-	active, err := q.Active()
+	activeTasks, err := q.Active()
 	if err != nil {
 		return err
 	}
+
 	// Check all dep IDs exist in pending/active/done
 	knownIDs := make(map[int]bool)
 	for _, t := range pending {
@@ -282,8 +431,8 @@ func (q *Queue) ValidateDependencies(newID int, deps []int) error {
 	for _, t := range done {
 		knownIDs[t.ID] = true
 	}
-	if active != nil {
-		knownIDs[active.ID] = true
+	for _, t := range activeTasks {
+		knownIDs[t.ID] = true
 	}
 	for _, dep := range deps {
 		if !knownIDs[dep] {
@@ -294,11 +443,11 @@ func (q *Queue) ValidateDependencies(newID int, deps []int) error {
 	// Add hypothetical new task and check for cycles
 	newTask := &Task{ID: newID, DependsOn: deps}
 	pending = append(pending, newTask)
-	nodes := BuildGraph(pending, active, done)
+	nodes := BuildGraph(pending, activeTasks, done)
 	return DetectCycle(nodes)
 }
 
-// NextID scans queue/ (including .doing and done/) for the highest existing ID and returns ID+1.
+// NextID scans queue/ (including .doing/ and done/) for the highest existing ID and returns ID+1.
 func (q *Queue) NextID() int {
 	maxID := 0
 
@@ -318,10 +467,18 @@ func (q *Queue) NextID() int {
 		}
 	}
 
-	// Check .doing
-	doingPath := filepath.Join(q.queueDir, ".doing")
-	if data, err := os.ReadFile(doingPath); err == nil {
-		if t, err := ParseTask(data); err == nil && t.ID > maxID {
+	// Check .doing/ directory
+	doingEntries, _ := filepath.Glob(filepath.Join(q.queueDir, ".doing", "*.md"))
+	for _, path := range doingEntries {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		t, err := ParseTask(data)
+		if err != nil {
+			continue
+		}
+		if t.ID > maxID {
 			maxID = t.ID
 		}
 	}

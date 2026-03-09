@@ -14,15 +14,15 @@ var queueCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if active != nil {
-			fmt.Printf("  %03d  ← doing  %s\n", active.ID, active.Title)
+		for _, t := range active {
+			fmt.Printf("  %03d  ← doing  %s\n", t.ID, t.Title)
 		}
 
 		tasks, err := q.List()
 		if err != nil {
 			return err
 		}
-		if len(tasks) == 0 && active == nil {
+		if len(tasks) == 0 && len(active) == 0 {
 			fmt.Println("queue is empty")
 			return nil
 		}

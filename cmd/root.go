@@ -64,7 +64,8 @@ func init() {
 	// cubit queue
 	rootCmd.AddCommand(queueCmd)
 
-	// cubit do
+	// cubit do [--all]
+	doCmd.Flags().Bool("all", false, "Pop all ready tasks at once")
 	rootCmd.AddCommand(doCmd)
 
 	// cubit done ["summary"]
@@ -83,10 +84,11 @@ func init() {
 	// cubit brief
 	rootCmd.AddCommand(briefCmd)
 
-	// cubit run [--once] [--cooldown 30s] [--no-memory]
+	// cubit run [--once] [--cooldown 30s] [--no-memory] [--max-parallel N]
 	runCmd.Flags().Bool("once", false, "Execute one task then stop")
 	runCmd.Flags().Duration("cooldown", 30*time.Second, "Wait duration between tasks")
 	runCmd.Flags().Bool("no-memory", false, "Skip the post-session memory pass")
+	runCmd.Flags().Int("max-parallel", 0, "Max concurrent tasks (0 = NumCPU*4)")
 	rootCmd.AddCommand(runCmd)
 
 	// cubit status
