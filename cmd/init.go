@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/SeanoChang/cubit/internal/config"
 	"github.com/SeanoChang/cubit/internal/scaffold"
 	"github.com/spf13/cobra"
 )
@@ -17,11 +16,6 @@ var initCmd = &cobra.Command{
 	Short: "Scaffold a new agent workspace",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("loading config: %w", err)
-		}
-
 		var agent string
 		if len(args) > 0 {
 			agent = args[0]

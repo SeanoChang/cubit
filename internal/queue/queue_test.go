@@ -9,6 +9,7 @@ import (
 
 func setupTestDir(t *testing.T) string {
 	t.Helper()
+	instance = nil // reset singleton between tests
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "queue"), 0o755)
 	os.MkdirAll(filepath.Join(dir, "memory"), 0o755)
@@ -18,7 +19,7 @@ func setupTestDir(t *testing.T) string {
 
 func TestCreateTask(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 
 	task, err := q.Create("implement FTS5 insert", "")
 	if err != nil {
@@ -41,7 +42,7 @@ func TestCreateTask(t *testing.T) {
 
 func TestCreateTaskWithContext(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 
 	task, err := q.Create("sweep arch", "baseline val_bpb: 0.997")
 	if err != nil {
@@ -54,7 +55,7 @@ func TestCreateTaskWithContext(t *testing.T) {
 
 func TestCreateAutoIncrements(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 
 	q.Create("first", "")
 	task2, _ := q.Create("second", "")
@@ -65,7 +66,7 @@ func TestCreateAutoIncrements(t *testing.T) {
 
 func TestList(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 	q.Create("first", "")
 	q.Create("second", "")
 
@@ -83,7 +84,7 @@ func TestList(t *testing.T) {
 
 func TestPop(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 	q.Create("first", "")
 	q.Create("second", "")
 
@@ -113,7 +114,7 @@ func TestPop(t *testing.T) {
 
 func TestPopRefusesWhenDoing(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 	q.Create("first", "")
 	q.Create("second", "")
 
@@ -126,7 +127,7 @@ func TestPopRefusesWhenDoing(t *testing.T) {
 
 func TestPopEmptyQueue(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 
 	_, err := q.Pop()
 	if err == nil {
@@ -136,7 +137,7 @@ func TestPopEmptyQueue(t *testing.T) {
 
 func TestComplete(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 	q.Create("first", "")
 	q.Pop()
 
@@ -163,7 +164,7 @@ func TestComplete(t *testing.T) {
 
 func TestRequeue(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 	q.Create("first", "")
 	q.Pop()
 
@@ -190,7 +191,7 @@ func TestRequeue(t *testing.T) {
 
 func TestLogObservation(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 
 	err := q.Log("something interesting happened")
 	if err != nil {
@@ -208,7 +209,7 @@ func TestLogObservation(t *testing.T) {
 
 func TestActiveTask(t *testing.T) {
 	dir := setupTestDir(t)
-	q := NewQueue(dir)
+	q := GetQueue(dir)
 
 	// No active task
 	task, err := q.Active()

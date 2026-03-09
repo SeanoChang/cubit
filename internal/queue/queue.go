@@ -1,3 +1,4 @@
+// Package queue manages the task lifecycle for a cubit agent.
 package queue
 
 import (
@@ -15,12 +16,17 @@ type Queue struct {
 	logPath  string // path to memory/log.md
 }
 
-// NewQueue creates a Queue rooted at the agent directory.
-func NewQueue(agentDir string) *Queue {
-	return &Queue{
-		queueDir: filepath.Join(agentDir, "queue"),
-		logPath:  filepath.Join(agentDir, "memory", "log.md"),
+var instance *Queue
+
+// GetQueue returns the singleton Queue, initializing it on first call.
+func GetQueue(agentDir string) *Queue {
+	if instance == nil {
+		instance = &Queue{
+			queueDir: filepath.Join(agentDir, "queue"),
+			logPath:  filepath.Join(agentDir, "memory", "log.md"),
+		}
 	}
+	return instance
 }
 
 // Create adds a new task to the queue. Returns the created task.
@@ -103,7 +109,9 @@ func (q *Queue) Pop() (*Task, error) {
 		if err := os.WriteFile(doingPath, task.Serialize(), 0o644); err != nil {
 			return nil, fmt.Errorf("writing .doing: %w", err)
 		}
-		os.Remove(path)
+		if err := os.Remove(path); err != nil {
+			return nil, fmt.Errorf("removing original task file: %w", err)
+		}
 		return task, nil
 	}
 
@@ -179,9 +187,14 @@ func (q *Queue) appendLog(entry string) error {
 	if err != nil {
 		return fmt.Errorf("opening log: %w", err)
 	}
-	defer f.Close()
-	_, err = f.WriteString(entry)
-	return err
+	if _, err = f.WriteString(entry); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("writing log: %w", err)
+	}
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("closing log: %w", err)
+	}
+	return nil
 }
 
 // nextID scans queue/ (including .doing) for the highest existing ID and returns ID+1.

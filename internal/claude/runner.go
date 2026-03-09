@@ -1,3 +1,4 @@
+// Package claude wraps the claude CLI for prompt execution.
 package claude
 
 import (

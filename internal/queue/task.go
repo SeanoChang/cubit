@@ -50,20 +50,17 @@ func (t *Task) Serialize() []byte {
 
 // extractTitle pulls the first markdown heading from the body.
 func extractTitle(body string) string {
-	for _, line := range strings.Split(body, "\n") {
+	var fallback string
+	for line := range strings.SplitSeq(body, "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "# ") {
-			return strings.TrimPrefix(line, "# ")
+		if title, ok := strings.CutPrefix(line, "# "); ok {
+			return title
+		}
+		if fallback == "" && line != "" {
+			fallback = line
 		}
 	}
-	// Fallback: first non-empty line
-	for _, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			return line
-		}
-	}
-	return ""
+	return fallback
 }
 
 var nonAlphaNum = regexp.MustCompile(`[^a-z0-9]+`)

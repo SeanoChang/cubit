@@ -70,7 +70,7 @@ func RunSetup(agentDir, agent string) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	var history []string
 
-	fmt.Println("\nStarting agent setup — answer a few questions to configure the workspace.\n")
+	fmt.Println("\nStarting agent setup — answer a few questions to configure the workspace.")
 
 	for range maxRounds {
 		if err := ctx.Err(); err != nil {
