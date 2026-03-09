@@ -116,6 +116,43 @@ created: 2026-03-09T00:00:00Z
 	}
 }
 
+func TestParseTaskModelField(t *testing.T) {
+	raw := `---
+id: 1
+status: pending
+created: 2026-03-09T00:00:00Z
+model: claude-sonnet-4-6
+---
+
+# my task
+`
+	task, err := ParseTask([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseTask: %v", err)
+	}
+	if task.Model != "claude-sonnet-4-6" {
+		t.Errorf("Model = %q, want claude-sonnet-4-6", task.Model)
+	}
+}
+
+func TestParseTaskModelFieldEmpty(t *testing.T) {
+	raw := `---
+id: 1
+status: pending
+created: 2026-03-09T00:00:00Z
+---
+
+# my task
+`
+	task, err := ParseTask([]byte(raw))
+	if err != nil {
+		t.Fatalf("ParseTask: %v", err)
+	}
+	if task.Model != "" {
+		t.Errorf("Model = %q, want empty", task.Model)
+	}
+}
+
 func TestSlugify(t *testing.T) {
 	tests := []struct {
 		in, want string

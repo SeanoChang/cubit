@@ -21,6 +21,7 @@ func Init(root, agent string) (bool, error) {
 	dirs := []string{
 		filepath.Join(agentDir, "identity"),
 		filepath.Join(agentDir, "queue"),
+		filepath.Join(agentDir, "queue", "done"),
 		filepath.Join(agentDir, "scratch"),
 		filepath.Join(agentDir, "memory", "sessions"),
 	}

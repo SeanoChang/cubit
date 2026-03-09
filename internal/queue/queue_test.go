@@ -12,6 +12,7 @@ func setupTestDir(t *testing.T) string {
 	instance = nil // reset singleton between tests
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "queue"), 0o755)
+	os.MkdirAll(filepath.Join(dir, "queue", "done"), 0o755)
 	os.MkdirAll(filepath.Join(dir, "memory"), 0o755)
 	os.WriteFile(filepath.Join(dir, "memory", "log.md"), []byte(""), 0o644)
 	return dir
@@ -210,6 +211,12 @@ func TestComplete(t *testing.T) {
 		t.Error(".doing still exists after Complete")
 	}
 
+	// done file should exist
+	doneMatches, _ := filepath.Glob(filepath.Join(dir, "queue", "done", "001-*.md"))
+	if len(doneMatches) != 1 {
+		t.Fatalf("expected 1 done file matching queue/done/001-*.md, got %d", len(doneMatches))
+	}
+
 	// log.md should have entry
 	logData, _ := os.ReadFile(filepath.Join(dir, "memory", "log.md"))
 	if !strings.Contains(string(logData), "first") {
@@ -217,6 +224,30 @@ func TestComplete(t *testing.T) {
 	}
 	if !strings.Contains(string(logData), "done with it") {
 		t.Errorf("log.md missing summary: %s", logData)
+	}
+}
+
+func TestListDone(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+
+	q.Create("first", CreateOptions{})
+	q.Create("second", CreateOptions{})
+	q.Pop()
+	q.Complete("first done")
+
+	done, err := q.ListDone()
+	if err != nil {
+		t.Fatalf("ListDone: %v", err)
+	}
+	if len(done) != 1 {
+		t.Fatalf("ListDone len = %d, want 1", len(done))
+	}
+	if done[0].ID != 1 {
+		t.Errorf("done[0].ID = %d, want 1", done[0].ID)
+	}
+	if done[0].Status != "done" {
+		t.Errorf("done[0].Status = %q, want done", done[0].Status)
 	}
 }
 
@@ -290,5 +321,25 @@ func TestActiveTask(t *testing.T) {
 	}
 	if task.ID != 1 {
 		t.Errorf("Active ID = %d, want 1", task.ID)
+	}
+}
+
+func TestValidateDependencies_NoCycle(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	q.Create("first", CreateOptions{})
+	if err := q.ValidateDependencies(2, []int{1}); err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+}
+
+func TestValidateDependencies_Cycle(t *testing.T) {
+	dir := setupTestDir(t)
+	q := GetQueue(dir)
+	// task 1 depends on task 2 (which doesn't exist yet)
+	q.Create("first", CreateOptions{DependsOn: []int{2}})
+	// now validate adding task 2 with dep on task 1 — would cycle
+	if err := q.ValidateDependencies(2, []int{1}); err == nil {
+		t.Error("expected cycle error, got nil")
 	}
 }

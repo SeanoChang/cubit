@@ -16,6 +16,7 @@ var todoCmd = &cobra.Command{
 		ctx, _ := cmd.Flags().GetString("context")
 		file, _ := cmd.Flags().GetString("file")
 		mode, _ := cmd.Flags().GetString("mode")
+		model, _ := cmd.Flags().GetString("model")
 		dependsOn, _ := cmd.Flags().GetIntSlice("depends-on")
 		program, _ := cmd.Flags().GetString("program")
 		goal, _ := cmd.Flags().GetString("goal")
@@ -38,9 +39,16 @@ var todoCmd = &cobra.Command{
 			dependsOn = nil
 		}
 
+		if len(dependsOn) > 0 {
+			if err := q.ValidateDependencies(q.NextID(), dependsOn); err != nil {
+				return fmt.Errorf("dependency validation: %w", err)
+			}
+		}
+
 		task, err := q.Create(args[0], queue.CreateOptions{
 			Context:       ctx,
 			Mode:          mode,
+			Model:         model,
 			DependsOn:     dependsOn,
 			Program:       program,
 			Goal:          goal,

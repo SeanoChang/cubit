@@ -58,6 +58,7 @@ func init() {
 	todoCmd.Flags().String("goal", "", "Exit condition for loop mode (agent evaluates)")
 	todoCmd.Flags().Int("max-iterations", 0, "Maximum loop iterations (0 = unlimited)")
 	todoCmd.Flags().String("branch", "", "Git branch for this task (convention, not enforced)")
+	todoCmd.Flags().String("model", "", "Claude model override for this task (empty = use config default)")
 	rootCmd.AddCommand(todoCmd)
 
 	// cubit queue
@@ -93,6 +94,12 @@ func init() {
 
 	// cubit refresh
 	rootCmd.AddCommand(refreshCmd)
+
+	// cubit graph [id] [--status s] [--mode m] [--ascii]
+	graphCmd.Flags().String("status", "", "Filter by status: ready,waiting,done,active (comma-separated)")
+	graphCmd.Flags().String("mode", "", "Filter by mode: once or loop")
+	graphCmd.Flags().Bool("ascii", false, "Render subgraph as ASCII tree instead of Mermaid (only with task ID)")
+	rootCmd.AddCommand(graphCmd)
 }
 
 func Execute() {

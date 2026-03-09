@@ -33,6 +33,7 @@ func GetQueue(agentDir string) *Queue {
 type CreateOptions struct {
 	Context       string
 	Mode          string
+	Model         string
 	DependsOn     []int
 	Program       string
 	Goal          string
@@ -42,7 +43,7 @@ type CreateOptions struct {
 
 // Create adds a new task to the queue. Returns the created task.
 func (q *Queue) Create(description string, opts CreateOptions) (*Task, error) {
-	id := q.nextID()
+	id := q.NextID()
 
 	body := fmt.Sprintf("# %s", description)
 	if opts.Context != "" {
@@ -59,6 +60,7 @@ func (q *Queue) Create(description string, opts CreateOptions) (*Task, error) {
 		Status:        "pending",
 		Created:       time.Now().UTC().Truncate(time.Second),
 		Mode:          mode,
+		Model:         opts.Model,
 		DependsOn:     opts.DependsOn,
 		Program:       opts.Program,
 		Goal:          opts.Goal,
@@ -98,6 +100,30 @@ func (q *Queue) List() ([]*Task, error) {
 		tasks = append(tasks, task)
 	}
 
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].ID < tasks[j].ID
+	})
+	return tasks, nil
+}
+
+// ListDone returns all completed tasks sorted by ID.
+func (q *Queue) ListDone() ([]*Task, error) {
+	entries, err := filepath.Glob(filepath.Join(q.queueDir, "done", "*.md"))
+	if err != nil {
+		return nil, err
+	}
+	var tasks []*Task
+	for _, path := range entries {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		task, err := ParseTask(data)
+		if err != nil {
+			continue
+		}
+		tasks = append(tasks, task)
+	}
 	sort.Slice(tasks, func(i, j int) bool {
 		return tasks[i].ID < tasks[j].ID
 	})
@@ -173,6 +199,17 @@ func (q *Queue) Complete(summary string) error {
 		return err
 	}
 
+	task.Status = "done"
+	doneDir := filepath.Join(q.queueDir, "done")
+	if err := os.MkdirAll(doneDir, 0o755); err != nil {
+		return fmt.Errorf("creating done dir: %w", err)
+	}
+	slug := Slugify(task.Title)
+	donePath := filepath.Join(doneDir, fmt.Sprintf("%03d-%s.md", task.ID, slug))
+	if err := os.WriteFile(donePath, task.Serialize(), 0o644); err != nil {
+		return fmt.Errorf("writing done task: %w", err)
+	}
+
 	return os.Remove(filepath.Join(q.queueDir, ".doing"))
 }
 
@@ -219,8 +256,50 @@ func (q *Queue) appendLog(entry string) error {
 	return nil
 }
 
-// nextID scans queue/ (including .doing) for the highest existing ID and returns ID+1.
-func (q *Queue) nextID() int {
+// ValidateDependencies checks whether adding a task with the given ID and deps
+// would introduce a cycle. Call before Create(). Returns an error if cyclic.
+func (q *Queue) ValidateDependencies(newID int, deps []int) error {
+	if len(deps) == 0 {
+		return nil
+	}
+	pending, err := q.List()
+	if err != nil {
+		return err
+	}
+	done, err := q.ListDone()
+	if err != nil {
+		return err
+	}
+	active, err := q.Active()
+	if err != nil {
+		return err
+	}
+	// Check all dep IDs exist in pending/active/done
+	knownIDs := make(map[int]bool)
+	for _, t := range pending {
+		knownIDs[t.ID] = true
+	}
+	for _, t := range done {
+		knownIDs[t.ID] = true
+	}
+	if active != nil {
+		knownIDs[active.ID] = true
+	}
+	for _, dep := range deps {
+		if !knownIDs[dep] {
+			return fmt.Errorf("dependency %03d does not exist", dep)
+		}
+	}
+
+	// Add hypothetical new task and check for cycles
+	newTask := &Task{ID: newID, DependsOn: deps}
+	pending = append(pending, newTask)
+	nodes := BuildGraph(pending, active, done)
+	return DetectCycle(nodes)
+}
+
+// NextID scans queue/ (including .doing and done/) for the highest existing ID and returns ID+1.
+func (q *Queue) NextID() int {
 	maxID := 0
 
 	// Check queued files
@@ -243,6 +322,22 @@ func (q *Queue) nextID() int {
 	doingPath := filepath.Join(q.queueDir, ".doing")
 	if data, err := os.ReadFile(doingPath); err == nil {
 		if t, err := ParseTask(data); err == nil && t.ID > maxID {
+			maxID = t.ID
+		}
+	}
+
+	// Check done/
+	doneEntries, _ := filepath.Glob(filepath.Join(q.queueDir, "done", "*.md"))
+	for _, path := range doneEntries {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		t, err := ParseTask(data)
+		if err != nil {
+			continue
+		}
+		if t.ID > maxID {
 			maxID = t.ID
 		}
 	}

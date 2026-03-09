@@ -16,6 +16,7 @@ type Task struct {
 	Status        string    `yaml:"status"`
 	Created       time.Time `yaml:"created"`
 	Mode          string    `yaml:"mode,omitempty"`
+	Model         string    `yaml:"model,omitempty"`
 	DependsOn     []int     `yaml:"depends_on,omitempty"`
 	Program       string    `yaml:"program,omitempty"`
 	Goal          string    `yaml:"goal,omitempty"`
