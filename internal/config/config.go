@@ -16,9 +16,10 @@ type Config struct {
 }
 
 type ClaudeConfig struct {
-	Model       string        `yaml:"model"        mapstructure:"model"`
-	Timeout     time.Duration `yaml:"timeout"      mapstructure:"timeout"`
-	MemoryModel string        `yaml:"memory_model" mapstructure:"memory_model"`
+	Model           string        `yaml:"model"            mapstructure:"model"`
+	Timeout         time.Duration `yaml:"timeout"          mapstructure:"timeout"`
+	MemoryModel     string        `yaml:"memory_model"     mapstructure:"memory_model"`
+	RefreshJournals int           `yaml:"refresh_journals" mapstructure:"refresh_journals"`
 }
 
 func DefaultRoot() string {
@@ -38,6 +39,7 @@ func Load() (*Config, error) {
 	v.SetDefault("claude.model", "claude-opus-4-6")
 	v.SetDefault("claude.timeout", "5m")
 	v.SetDefault("claude.memory_model", "claude-sonnet-4-6")
+	v.SetDefault("claude.refresh_journals", 5)
 
 	// Config file location
 	root := DefaultRoot()
@@ -71,9 +73,10 @@ func Default(agent string) *Config {
 		Agent: agent,
 		Root:  DefaultRoot(),
 		Claude: ClaudeConfig{
-			Model:       "claude-opus-4-6",
-			Timeout:     5 * time.Minute,
-			MemoryModel: "claude-sonnet-4-6",
+			Model:           "claude-opus-4-6",
+			Timeout:         5 * time.Minute,
+			MemoryModel:     "claude-sonnet-4-6",
+			RefreshJournals: 5,
 		},
 	}
 }

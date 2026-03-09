@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/SeanoChang/cubit/internal/claude"
@@ -56,4 +57,76 @@ func buildMemoryPrompt(agentDir, rawOutput string) string {
 	logContent := tail(readFile(filepath.Join(agentDir, "memory", "log.md")), 50)
 
 	return fmt.Sprintf(memoryPassPrompt, oldBrief, truncatedOutput, logContent)
+}
+
+const refreshPrompt = `You are refreshing your working memory from scratch.
+Below are your recent session journals and log entries.
+Write a new brief.md that captures the current state of your work.
+
+1. Recent session journals:
+%s
+
+2. Recent log entries:
+%s
+
+Write brief.md from scratch based on these sources.
+Rules:
+- Keep it under 30k tokens
+- Include sections: Current state, Key decisions, Open threads, Recent work
+- Synthesize across journals — don't just concatenate
+- Capture what matters NOW, drop stale context
+- Output ONLY the new brief.md content, nothing else.`
+
+// RunRefresh rebuilds memory/brief.md from scratch using recent session
+// journals and log entries. Unlike RunMemoryPass, it does not carry over
+// the old brief — it reads raw sources and synthesizes a fresh summary.
+func RunRefresh(agentDir, model string, numJournals int) error {
+	prompt := buildRefreshPrompt(agentDir, numJournals)
+
+	result, err := claude.Prompt(prompt, model)
+	if err != nil {
+		return fmt.Errorf("refresh: %w", err)
+	}
+
+	briefPath := filepath.Join(agentDir, "memory", "brief.md")
+	if err := os.WriteFile(briefPath, []byte(strings.TrimSpace(result)+"\n"), 0o644); err != nil {
+		return fmt.Errorf("refresh: write brief.md: %w", err)
+	}
+
+	return nil
+}
+
+// buildRefreshPrompt assembles the fresh-start prompt from recent journals and log.
+func buildRefreshPrompt(agentDir string, numJournals int) string {
+	journals := recentJournals(agentDir, numJournals)
+	logContent := tail(readFile(filepath.Join(agentDir, "memory", "log.md")), 50)
+
+	return fmt.Sprintf(refreshPrompt, journals, logContent)
+}
+
+// recentJournals reads the last n journal files from memory/sessions/*.md,
+// sorted by filename, and joins them with a separator.
+func recentJournals(agentDir string, n int) string {
+	pattern := filepath.Join(agentDir, "memory", "sessions", "*.md")
+	matches, err := filepath.Glob(pattern)
+	if err != nil || len(matches) == 0 {
+		return ""
+	}
+
+	sort.Strings(matches)
+
+	// Take only the last n.
+	if len(matches) > n {
+		matches = matches[len(matches)-n:]
+	}
+
+	var parts []string
+	for _, path := range matches {
+		content := readFile(path)
+		if content != "" {
+			parts = append(parts, content)
+		}
+	}
+
+	return strings.Join(parts, "\n\n---\n\n")
 }

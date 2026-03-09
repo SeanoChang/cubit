@@ -67,16 +67,24 @@ func init() {
 	// cubit log "observation"
 	rootCmd.AddCommand(logCmd)
 
-	// cubit prompt "message"
+	// cubit prompt "message" [--no-memory]
+	promptCmd.Flags().Bool("no-memory", false, "Skip the post-session memory pass")
 	rootCmd.AddCommand(promptCmd)
 
 	// cubit brief
 	rootCmd.AddCommand(briefCmd)
 
-	// cubit run [--once] [--cooldown 30s]
+	// cubit run [--once] [--cooldown 30s] [--no-memory]
 	runCmd.Flags().Bool("once", false, "Execute one task then stop")
 	runCmd.Flags().Duration("cooldown", 30*time.Second, "Wait duration between tasks")
+	runCmd.Flags().Bool("no-memory", false, "Skip the post-session memory pass")
 	rootCmd.AddCommand(runCmd)
+
+	// cubit status
+	rootCmd.AddCommand(statusCmd)
+
+	// cubit refresh
+	rootCmd.AddCommand(refreshCmd)
 }
 
 func Execute() {

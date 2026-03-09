@@ -19,6 +19,7 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		once, _ := cmd.Flags().GetBool("once")
 		cooldown, _ := cmd.Flags().GetDuration("cooldown")
+		noMemory, _ := cmd.Flags().GetBool("no-memory")
 
 		// Graceful shutdown on SIGINT.
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -70,8 +71,10 @@ var runCmd = &cobra.Command{
 			fmt.Printf("✓ %03d: %s\n", task.ID, task.Title)
 
 			// Memory pass (non-fatal).
-			if err := brief.RunMemoryPass(cfg.AgentDir(), result, cfg.Claude.MemoryModel); err != nil {
-				fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", err)
+			if !noMemory {
+				if err := brief.RunMemoryPass(cfg.AgentDir(), result, cfg.Claude.MemoryModel); err != nil {
+					fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", err)
+				}
 			}
 
 			if once {
