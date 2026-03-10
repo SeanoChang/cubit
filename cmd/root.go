@@ -108,6 +108,13 @@ func init() {
 
 	// cubit update
 	rootCmd.AddCommand(updateCmd)
+
+	// cubit identity list|show|set
+	identitySetCmd.Flags().StringP("file", "f", "", "Read content from file")
+	identityCmd.AddCommand(identityListCmd)
+	identityCmd.AddCommand(identityShowCmd)
+	identityCmd.AddCommand(identitySetCmd)
+	rootCmd.AddCommand(identityCmd)
 }
 
 func Execute() {
