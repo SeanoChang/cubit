@@ -35,7 +35,7 @@ func TestBuildWithUpstream_InjectsOutputPaths(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "scratch", "001-output.md"), []byte("result 1"), 0o644)
 	os.WriteFile(filepath.Join(dir, "scratch", "002-output.md"), []byte("result 2"), 0o644)
 
-	result := BuildWithUpstream(dir, []int{1, 2})
+	result := BuildWithUpstream(dir, 3, []int{1, 2})
 
 	if !strings.Contains(result, "## Upstream Results") {
 		t.Error("missing Upstream Results section")
@@ -53,7 +53,7 @@ func TestBuildWithUpstream_SkipsMissingOutputs(t *testing.T) {
 
 	os.WriteFile(filepath.Join(dir, "scratch", "001-output.md"), []byte("result 1"), 0o644)
 
-	result := BuildWithUpstream(dir, []int{1, 2})
+	result := BuildWithUpstream(dir, 3, []int{1, 2})
 
 	if !strings.Contains(result, "001-output.md") {
 		t.Error("should include existing output")
@@ -66,7 +66,7 @@ func TestBuildWithUpstream_SkipsMissingOutputs(t *testing.T) {
 func TestBuildWithUpstream_NoUpstream(t *testing.T) {
 	dir := setupBriefTestDir(t)
 
-	result := BuildWithUpstream(dir, nil)
+	result := BuildWithUpstream(dir, 1, nil)
 
 	if strings.Contains(result, "Upstream Results") {
 		t.Error("should not have Upstream Results with no upstream IDs")
@@ -79,7 +79,7 @@ func TestBuildLoopInjection_WithProgram(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "sweep.md"), []byte("# Sweep Program\nRun experiments."), 0o644)
 	os.WriteFile(filepath.Join(dir, "memory", "results.tsv"), []byte("commit\tval_bpb\na1b2\t0.98\n"), 0o644)
 
-	injection := BuildLoopInjection(dir, "sweep.md", "val_bpb < 0.95", 3, 100)
+	injection := BuildLoopInjection(dir, 5, "sweep.md", "val_bpb < 0.95", 3, 100)
 
 	if !strings.Contains(injection, "Sweep Program") {
 		t.Error("expected program.md content in injection")
@@ -101,7 +101,7 @@ func TestBuildLoopInjection_WithProgram(t *testing.T) {
 func TestBuildLoopInjection_NoProgram(t *testing.T) {
 	dir := setupBriefTestDir(t)
 
-	injection := BuildLoopInjection(dir, "", "", 1, 0)
+	injection := BuildLoopInjection(dir, 1, "", "", 1, 0)
 
 	if strings.Contains(injection, "## Program") {
 		t.Error("should not have program section when no program file")

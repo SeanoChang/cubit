@@ -78,13 +78,23 @@ func Build(agentDir string) string {
 	return strings.Join(parts, "\n\n---\n\n")
 }
 
+// observationInstruction returns the prompt instruction for worker observation files.
+func observationInstruction(taskID int) string {
+	return fmt.Sprintf(`## Observation Log
+After completing your work, write key observations, decisions, and learnings
+to scratch/%03d-observations.md. These will be consolidated into the agent's
+memory after all tasks complete. Keep it concise — focus on what matters for
+future work, not a replay of what you did.`, taskID)
+}
+
 // BuildWithUpstream builds the session brief and appends upstream output paths
 // for fan-in nodes. upstreamIDs are task IDs whose outputs should be referenced.
-func BuildWithUpstream(agentDir string, upstreamIDs []int) string {
+// taskID is the current task's ID, used for the observation file instruction.
+func BuildWithUpstream(agentDir string, taskID int, upstreamIDs []int) string {
 	base := Build(agentDir)
 
 	if len(upstreamIDs) == 0 {
-		return base
+		return base + "\n\n---\n\n" + observationInstruction(taskID)
 	}
 
 	var paths []string
@@ -102,14 +112,14 @@ func BuildWithUpstream(agentDir string, upstreamIDs []int) string {
 	}
 
 	upstream := "## Upstream Results\n" + strings.Join(paths, "\n")
-	return base + "\n\n---\n\n" + upstream
+	return base + "\n\n---\n\n" + upstream + "\n\n---\n\n" + observationInstruction(taskID)
 }
 
 // BuildLoopInjection builds the injection for a loop iteration.
 // program is a path relative to agentDir (e.g. "sweep.md"). If empty, no program section.
 // goal is the exit condition string. iteration is the current iteration number.
 // maxIterations is the limit (0 = unlimited).
-func BuildLoopInjection(agentDir, program, goal string, iteration, maxIterations int) string {
+func BuildLoopInjection(agentDir string, taskID int, program, goal string, iteration, maxIterations int) string {
 	base := Build(agentDir)
 
 	var extra []string
@@ -141,6 +151,7 @@ func BuildLoopInjection(agentDir, program, goal string, iteration, maxIterations
 	}
 	extra = append(extra, "## Loop Status\n"+goalBlock)
 
+	extra = append(extra, observationInstruction(taskID))
 	return base + "\n\n---\n\n" + strings.Join(extra, "\n\n---\n\n")
 }
 

@@ -54,7 +54,7 @@ var runCmd = &cobra.Command{
 				for running > 0 {
 					result := <-doneCh
 					running--
-					handleResult(result, noMemory)
+					handleResult(result)
 				}
 				return nil
 			default:
@@ -101,7 +101,7 @@ var runCmd = &cobra.Command{
 					for running > 0 {
 						r := <-doneCh
 						running--
-						handleResult(r, noMemory)
+						handleResult(r)
 					}
 					return nil
 				}
@@ -109,16 +109,16 @@ var runCmd = &cobra.Command{
 				running++
 				fmt.Printf("▶ %03d: %s\n", popped.ID, popped.Title)
 
-				go func(t *queue.Task, nm bool) {
+				go func(t *queue.Task) {
 					defer sem.Release(1)
 					var result queue.TaskResult
 					if t.Mode == "loop" {
-						result = executeLoop(ctx, t, nm)
+						result = executeLoop(ctx, t)
 					} else {
 						result = executeWithRetry(ctx, t, 3)
 					}
 					doneCh <- result
-				}(popped, noMemory)
+				}(popped)
 
 				if once {
 					break
@@ -132,7 +132,14 @@ var runCmd = &cobra.Command{
 				active, _ = q.Active()
 				doneList, _ = q.ListDone()
 				if queue.GraphComplete(pending, active, doneList) {
-					fmt.Println("Graph resolved. Done.")
+					fmt.Println("Graph resolved.")
+					if !noMemory {
+						fmt.Println("Running consolidation pass...")
+						if err := brief.RunConsolidation(ctx, cfg.AgentDir(), cfg.Claude.MemoryRunnerOpts()); err != nil {
+							fmt.Fprintf(os.Stderr, "  warning: consolidation failed: %v\n", err)
+						}
+					}
+					fmt.Println("Done.")
 					return nil
 				}
 				return &queue.DeadlockError{Stuck: pending}
@@ -142,7 +149,7 @@ var runCmd = &cobra.Command{
 			result := <-doneCh
 			running--
 			delete(dispatched, result.TaskID)
-			handleResult(result, noMemory)
+			handleResult(result)
 
 			if once {
 				// Drain remaining and exit
@@ -150,7 +157,7 @@ var runCmd = &cobra.Command{
 					r := <-doneCh
 					running--
 					delete(dispatched, r.TaskID)
-					handleResult(r, noMemory)
+					handleResult(r)
 				}
 				return nil
 			}
@@ -161,7 +168,7 @@ var runCmd = &cobra.Command{
 					for running > 0 {
 						r := <-doneCh
 						running--
-						handleResult(r, noMemory)
+						handleResult(r)
 					}
 					return nil
 				}
@@ -175,7 +182,7 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 	agentDir := c.AgentDir()
 	scratchDir := filepath.Join(agentDir, "scratch")
 
-	injection := brief.BuildWithUpstream(agentDir, task.DependsOn)
+	injection := brief.BuildWithUpstream(agentDir, task.ID, task.DependsOn)
 	full := injection + "\n\n---\n\nExecute the active task."
 
 	model := task.Model
@@ -229,7 +236,7 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 	}
 }
 
-func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.TaskResult {
+func executeLoop(ctx context.Context, task *queue.Task) queue.TaskResult {
 	c := getCfg()
 	agentDir := c.AgentDir()
 	scratchDir := filepath.Join(agentDir, "scratch")
@@ -270,7 +277,7 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 		}
 		fmt.Println()
 
-		injection := brief.BuildLoopInjection(agentDir, task.Program, task.Goal, iteration, maxIter)
+		injection := brief.BuildLoopInjection(agentDir, task.ID, task.Program, task.Goal, iteration, maxIter)
 		full := injection + "\n\n---\n\nExecute the next iteration of the active loop task."
 
 		opts := c.Claude.RunnerOpts()
@@ -287,12 +294,6 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 
 		fmt.Printf("\n%s\n\n", output)
 
-		if !noMemory {
-			if memErr := brief.RunMemoryPass(ctx, agentDir, output, c.Claude.MemoryRunnerOpts()); memErr != nil {
-				fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", memErr)
-			}
-		}
-
 		if task.Goal != "" && queue.GoalMet(output) {
 			queue.ClearIteration(scratchDir, task.ID)
 			return queue.TaskResult{
@@ -305,8 +306,7 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 	}
 }
 
-func handleResult(result queue.TaskResult, noMemory bool) {
-	c := getCfg()
+func handleResult(result queue.TaskResult) {
 	q := getQ()
 
 	if result.Err != nil {
@@ -333,11 +333,6 @@ func handleResult(result queue.TaskResult, noMemory bool) {
 	}
 	fmt.Printf("✓ %03d\n", result.TaskID)
 
-	if !noMemory {
-		if err := brief.RunMemoryPass(context.Background(), c.AgentDir(), result.Output, c.Claude.MemoryRunnerOpts()); err != nil {
-			fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", err)
-		}
-	}
 }
 
 func sleepOrCancel(ctx context.Context, d time.Duration) bool {

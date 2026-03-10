@@ -131,3 +131,59 @@ func recentJournals(agentDir string, n int) string {
 
 	return strings.Join(parts, "\n\n---\n\n")
 }
+
+const consolidationPrompt = `You are consolidating observations from parallel workers into the agent's working memory.
+
+1. Current brief.md:
+%s
+
+2. Worker observations:
+%s
+
+Rewrite brief.md to incorporate the key learnings from all workers.
+Rules:
+- Keep it under 30k tokens
+- Merge observations — don't just append them
+- Preserve existing key decisions and open threads
+- Add new findings, patterns, and decisions from the workers
+- Drop stale information superseded by worker results
+- Output ONLY the new brief.md content, nothing else.`
+
+// RunConsolidation reads all scratch/*-observations.md files and consolidates
+// them into memory/brief.md via a single LLM call. Called once after drain
+// completes all tasks. No-op if no observation files exist.
+func RunConsolidation(ctx context.Context, agentDir string, opts claude.RunnerOpts) error {
+	pattern := filepath.Join(agentDir, "scratch", "*-observations.md")
+	files, err := filepath.Glob(pattern)
+	if err != nil || len(files) == 0 {
+		return nil
+	}
+
+	sort.Strings(files)
+
+	var observations []string
+	for _, f := range files {
+		content := readFile(f)
+		if content != "" {
+			observations = append(observations, content)
+		}
+	}
+	if len(observations) == 0 {
+		return nil
+	}
+
+	currentBrief := readFile(filepath.Join(agentDir, "memory", "brief.md"))
+	prompt := fmt.Sprintf(consolidationPrompt, currentBrief, strings.Join(observations, "\n\n---\n\n"))
+
+	result, err := claude.Prompt(ctx, prompt, opts)
+	if err != nil {
+		return fmt.Errorf("consolidation: %w", err)
+	}
+
+	briefPath := filepath.Join(agentDir, "memory", "brief.md")
+	if err := os.WriteFile(briefPath, []byte(strings.TrimSpace(result)+"\n"), 0o644); err != nil {
+		return fmt.Errorf("consolidation: write brief.md: %w", err)
+	}
+
+	return nil
+}
