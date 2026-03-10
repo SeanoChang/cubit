@@ -6,6 +6,7 @@ import (
 
 	"github.com/SeanoChang/cubit/cmd/agent"
 	"github.com/SeanoChang/cubit/cmd/exec"
+	mcpcmd "github.com/SeanoChang/cubit/cmd/mcp"
 	"github.com/SeanoChang/cubit/cmd/task"
 	"github.com/SeanoChang/cubit/internal/config"
 	"github.com/SeanoChang/cubit/internal/queue"
@@ -61,6 +62,7 @@ func init() {
 	task.Register(rootCmd, getCfg, getQ)
 	exec.Register(rootCmd, getCfg, getQ)
 	agent.Register(rootCmd, getCfg, getQ)
+	mcpcmd.Register(rootCmd, getCfg, getQ)
 }
 
 func Execute() {

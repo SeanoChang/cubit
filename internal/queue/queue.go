@@ -19,6 +19,11 @@ type Queue struct {
 
 var instance *Queue
 
+// ResetForTest clears the singleton. Test-only.
+func ResetForTest() {
+	instance = nil
+}
+
 // GetQueue returns the singleton Queue, initializing it on first call.
 func GetQueue(agentDir string) *Queue {
 	if instance == nil {
