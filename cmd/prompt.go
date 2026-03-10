@@ -27,7 +27,7 @@ var promptCmd = &cobra.Command{
 
 		noMemory, _ := cmd.Flags().GetBool("no-memory")
 		if !noMemory {
-			if err := brief.RunMemoryPass(context.Background(), cfg.AgentDir(), result, cfg.Claude.MemoryModel); err != nil {
+			if err := brief.RunMemoryPass(context.Background(), cfg.AgentDir(), result, cfg.Claude.MemoryRunnerOpts()); err != nil {
 				fmt.Printf("warning: memory pass failed: %v\n", err)
 			}
 		}

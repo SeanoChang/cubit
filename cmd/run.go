@@ -292,7 +292,7 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 
 		// Memory pass between iterations
 		if !noMemory {
-			if memErr := brief.RunMemoryPass(ctx, agentDir, output, cfg.Claude.MemoryModel); memErr != nil {
+			if memErr := brief.RunMemoryPass(ctx, agentDir, output, cfg.Claude.MemoryRunnerOpts()); memErr != nil {
 				fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", memErr)
 			}
 		}
@@ -337,7 +337,7 @@ func handleResult(result queue.TaskResult, noMemory bool) {
 	fmt.Printf("✓ %03d\n", result.TaskID)
 
 	if !noMemory {
-		if err := brief.RunMemoryPass(context.Background(), cfg.AgentDir(), result.Output, cfg.Claude.MemoryModel); err != nil {
+		if err := brief.RunMemoryPass(context.Background(), cfg.AgentDir(), result.Output, cfg.Claude.MemoryRunnerOpts()); err != nil {
 			fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", err)
 		}
 	}

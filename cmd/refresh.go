@@ -14,7 +14,7 @@ var refreshCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Refreshing brief.md from journals + log...")
 
-		if err := brief.RunRefresh(context.Background(), cfg.AgentDir(), cfg.Claude.MemoryModel, cfg.Claude.RefreshJournals); err != nil {
+		if err := brief.RunRefresh(context.Background(), cfg.AgentDir(), cfg.Claude.MemoryRunnerOpts(), cfg.Claude.RefreshJournals); err != nil {
 			return err
 		}
 

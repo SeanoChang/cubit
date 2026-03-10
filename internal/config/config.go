@@ -103,3 +103,11 @@ func (c *ClaudeConfig) RunnerOpts() claude.RunnerOpts {
 		WorkDir:        c.WorkDir,
 	}
 }
+
+// MemoryRunnerOpts returns RunnerOpts using the memory model instead of the
+// primary model. Inherits permission mode, allowed tools, etc. from config.
+func (c *ClaudeConfig) MemoryRunnerOpts() claude.RunnerOpts {
+	opts := c.RunnerOpts()
+	opts.Model = c.MemoryModel
+	return opts
+}
