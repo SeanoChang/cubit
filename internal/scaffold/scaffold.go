@@ -38,6 +38,7 @@ func Init(root, agent string) (bool, error) {
 		filepath.Join(agentDir, "USER.md"):                   "",
 		filepath.Join(agentDir, "GOALS.md"):                  "# Goals\n\n<!-- Agent-managed. Updated as work progresses. -->\n",
 		filepath.Join(agentDir, "memory", "brief.md"):        "",
+		filepath.Join(agentDir, "memory", "MEMORY.md"):        "",
 		filepath.Join(agentDir, "memory", "log.md"):          "",
 		filepath.Join(agentDir, "state.json"):                "{}",
 	}

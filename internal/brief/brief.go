@@ -29,6 +29,7 @@ func Build(agentDir string) string {
 		{"identity/FLUCTLIGHT.md", ""},
 		{"USER.md", ""},
 		{"GOALS.md", ""},
+		{"memory/MEMORY.md", ""},
 		{"memory/brief.md", ""},
 	}
 
@@ -157,6 +158,7 @@ func Sections(agentDir string) []Section {
 		{"identity/FLUCTLIGHT.md", "FLUCTLIGHT"},
 		{"USER.md", "USER"},
 		{"GOALS.md", "GOALS"},
+		{"memory/MEMORY.md", "Memory"},
 		{"memory/brief.md", "Brief"},
 	}
 

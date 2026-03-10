@@ -115,6 +115,12 @@ func init() {
 	identityCmd.AddCommand(identityShowCmd)
 	identityCmd.AddCommand(identitySetCmd)
 	rootCmd.AddCommand(identityCmd)
+
+	// cubit memory [show|append|edit]
+	memoryCmd.AddCommand(memoryShowCmd)
+	memoryCmd.AddCommand(memoryAppendCmd)
+	memoryCmd.AddCommand(memoryEditCmd)
+	rootCmd.AddCommand(memoryCmd)
 }
 
 func Execute() {
