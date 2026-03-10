@@ -84,6 +84,13 @@ var runCmd = &cobra.Command{
 				}
 			}
 
+			// Identify terminal nodes for archive injection
+			leaves := queue.LeafNodes(pending, active, doneList)
+			leafIDs := make(map[int]bool, len(leaves))
+			for _, l := range leaves {
+				leafIDs[l.ID] = true
+			}
+
 			// Launch ready tasks
 			for range toDispatch {
 				popped, err := q.PopReady()
@@ -109,16 +116,17 @@ var runCmd = &cobra.Command{
 				running++
 				fmt.Printf("▶ %03d: %s\n", popped.ID, popped.Title)
 
-				go func(t *queue.Task) {
+				isTerminal := leafIDs[popped.ID]
+				go func(t *queue.Task, term bool) {
 					defer sem.Release(1)
 					var result queue.TaskResult
 					if t.Mode == "loop" {
 						result = executeLoop(ctx, t)
 					} else {
-						result = executeWithRetry(ctx, t, 3)
+						result = executeWithRetry(ctx, t, 3, term)
 					}
 					doneCh <- result
-				}(popped)
+				}(popped, isTerminal)
 
 				if once {
 					break
@@ -139,6 +147,17 @@ var runCmd = &cobra.Command{
 							fmt.Fprintf(os.Stderr, "  warning: consolidation failed: %v\n", err)
 						}
 					}
+
+					// Post-drain lifecycle: archive, clear goals, slim brief, clean scratch
+					leaves := queue.LeafNodes(nil, nil, doneList)
+					if len(leaves) == 1 {
+						terminalOutput := readScratchOutput(cfg.AgentDir(), leaves[0].ID)
+						fmt.Println("Running post-drain lifecycle...")
+						if err := brief.RunPostDrainLifecycle(cfg.AgentDir(), terminalOutput); err != nil {
+							fmt.Fprintf(os.Stderr, "  warning: post-drain lifecycle failed: %v\n", err)
+						}
+					}
+
 					fmt.Println("Done.")
 					return nil
 				}
@@ -177,12 +196,12 @@ var runCmd = &cobra.Command{
 	},
 }
 
-func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) queue.TaskResult {
+func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int, terminal bool) queue.TaskResult {
 	c := getCfg()
 	agentDir := c.AgentDir()
 	scratchDir := filepath.Join(agentDir, "scratch")
 
-	injection := brief.BuildWithUpstream(agentDir, task.ID, task.DependsOn)
+	injection := brief.BuildWithUpstream(agentDir, task.ID, task.DependsOn, terminal)
 	full := injection + "\n\n---\n\nExecute the active task."
 
 	model := task.Model
@@ -333,6 +352,15 @@ func handleResult(result queue.TaskResult) {
 	}
 	fmt.Printf("✓ %03d\n", result.TaskID)
 
+}
+
+func readScratchOutput(agentDir string, taskID int) string {
+	path := filepath.Join(agentDir, "scratch", fmt.Sprintf("%03d-output.md", taskID))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func sleepOrCancel(ctx context.Context, d time.Duration) bool {

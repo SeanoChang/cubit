@@ -87,32 +87,48 @@ memory after all tasks complete. Keep it concise — focus on what matters for
 future work, not a replay of what you did.`, taskID)
 }
 
+const archiveInstruction = `## Archive Instructions
+You are the terminal summary node. Your job:
+1. Read all upstream results from the scratch files listed above.
+2. Consolidate findings into a structured summary.
+3. Write the summary to nark as a new note using: nark add "title" --body "content"
+4. Include the nark note ID in your output on its own line (format: nark: <id>).`
+
 // BuildWithUpstream builds the session brief and appends upstream output paths
 // for fan-in nodes. upstreamIDs are task IDs whose outputs should be referenced.
 // taskID is the current task's ID, used for the observation file instruction.
-func BuildWithUpstream(agentDir string, taskID int, upstreamIDs []int) string {
+// If terminal is true, archive instructions are injected for nark archival.
+func BuildWithUpstream(agentDir string, taskID int, upstreamIDs []int, terminal ...bool) string {
+	isTerminal := len(terminal) > 0 && terminal[0]
 	base := Build(agentDir)
 
-	if len(upstreamIDs) == 0 {
-		return base + "\n\n---\n\n" + observationInstruction(taskID)
-	}
+	var extras []string
 
-	var paths []string
-	for _, id := range upstreamIDs {
-		filename := fmt.Sprintf("%03d-output.md", id)
-		relPath := filepath.Join("scratch", filename)
-		absPath := filepath.Join(agentDir, relPath)
-		if _, err := os.Stat(absPath); err == nil {
-			paths = append(paths, "- "+relPath)
+	if len(upstreamIDs) > 0 {
+		var paths []string
+		for _, id := range upstreamIDs {
+			filename := fmt.Sprintf("%03d-output.md", id)
+			relPath := filepath.Join("scratch", filename)
+			absPath := filepath.Join(agentDir, relPath)
+			if _, err := os.Stat(absPath); err == nil {
+				paths = append(paths, "- "+relPath)
+			}
+		}
+		if len(paths) > 0 {
+			extras = append(extras, "## Upstream Results\n"+strings.Join(paths, "\n"))
 		}
 	}
 
-	if len(paths) == 0 {
-		return base
+	if isTerminal {
+		extras = append(extras, archiveInstruction)
+	} else {
+		extras = append(extras, observationInstruction(taskID))
 	}
 
-	upstream := "## Upstream Results\n" + strings.Join(paths, "\n")
-	return base + "\n\n---\n\n" + upstream + "\n\n---\n\n" + observationInstruction(taskID)
+	if len(extras) == 0 {
+		return base
+	}
+	return base + "\n\n---\n\n" + strings.Join(extras, "\n\n---\n\n")
 }
 
 // BuildLoopInjection builds the injection for a loop iteration.
