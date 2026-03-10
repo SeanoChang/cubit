@@ -1,6 +1,7 @@
 package brief
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,10 +35,10 @@ Rules:
 // RunMemoryPass rewrites memory/brief.md via a cheap LLM call.
 // It assembles a rewrite prompt from the old brief, session output, and log,
 // sends it to claude, and overwrites brief.md with the response.
-func RunMemoryPass(agentDir, rawOutput, model string) error {
+func RunMemoryPass(ctx context.Context, agentDir, rawOutput, model string) error {
 	prompt := buildMemoryPrompt(agentDir, rawOutput)
 
-	result, err := claude.Prompt(prompt, model)
+	result, err := claude.Prompt(ctx, prompt, claude.RunnerOpts{Model: model})
 	if err != nil {
 		return fmt.Errorf("memory pass: %w", err)
 	}
@@ -80,10 +81,10 @@ Rules:
 // RunRefresh rebuilds memory/brief.md from scratch using recent session
 // journals and log entries. Unlike RunMemoryPass, it does not carry over
 // the old brief — it reads raw sources and synthesizes a fresh summary.
-func RunRefresh(agentDir, model string, numJournals int) error {
+func RunRefresh(ctx context.Context, agentDir, model string, numJournals int) error {
 	prompt := buildRefreshPrompt(agentDir, numJournals)
 
-	result, err := claude.Prompt(prompt, model)
+	result, err := claude.Prompt(ctx, prompt, claude.RunnerOpts{Model: model})
 	if err != nil {
 		return fmt.Errorf("refresh: %w", err)
 	}

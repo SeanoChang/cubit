@@ -197,7 +197,9 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 			fmt.Fprintf(os.Stderr, "  %03d: retry %d/%d\n", task.ID, attempt, maxRetries)
 		}
 
-		output, err := claude.Prompt(full, model)
+		opts := cfg.Claude.RunnerOpts()
+		opts.Model = model
+		output, err := claude.Prompt(ctx, full, opts)
 		if err != nil {
 			lastErr = err
 			continue
@@ -273,7 +275,9 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 		injection := brief.BuildLoopInjection(agentDir, task.Program, task.Goal, iteration, maxIter)
 		full := injection + "\n\n---\n\nExecute the next iteration of the active loop task."
 
-		output, err := claude.Prompt(full, model)
+		opts := cfg.Claude.RunnerOpts()
+		opts.Model = model
+		output, err := claude.Prompt(ctx, full, opts)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  %03d: iteration %d error: %v\n", task.ID, iteration, err)
 			continue // retry next iteration on transient errors
@@ -288,7 +292,7 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 
 		// Memory pass between iterations
 		if !noMemory {
-			if memErr := brief.RunMemoryPass(agentDir, output, cfg.Claude.MemoryModel); memErr != nil {
+			if memErr := brief.RunMemoryPass(ctx, agentDir, output, cfg.Claude.MemoryModel); memErr != nil {
 				fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", memErr)
 			}
 		}
@@ -333,7 +337,7 @@ func handleResult(result queue.TaskResult, noMemory bool) {
 	fmt.Printf("✓ %03d\n", result.TaskID)
 
 	if !noMemory {
-		if err := brief.RunMemoryPass(cfg.AgentDir(), result.Output, cfg.Claude.MemoryModel); err != nil {
+		if err := brief.RunMemoryPass(context.Background(), cfg.AgentDir(), result.Output, cfg.Claude.MemoryModel); err != nil {
 			fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", err)
 		}
 	}

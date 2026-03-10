@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/SeanoChang/cubit/internal/brief"
@@ -16,7 +17,8 @@ var promptCmd = &cobra.Command{
 		injection := brief.Build(cfg.AgentDir())
 		full := injection + "\n\n---\n\n" + args[0]
 
-		result, err := claude.Prompt(full, cfg.Claude.Model)
+		opts := cfg.Claude.RunnerOpts()
+		result, err := claude.Prompt(context.Background(), full, opts)
 		if err != nil {
 			return err
 		}
@@ -25,7 +27,7 @@ var promptCmd = &cobra.Command{
 
 		noMemory, _ := cmd.Flags().GetBool("no-memory")
 		if !noMemory {
-			if err := brief.RunMemoryPass(cfg.AgentDir(), result, cfg.Claude.MemoryModel); err != nil {
+			if err := brief.RunMemoryPass(context.Background(), cfg.AgentDir(), result, cfg.Claude.MemoryModel); err != nil {
 				fmt.Printf("warning: memory pass failed: %v\n", err)
 			}
 		}

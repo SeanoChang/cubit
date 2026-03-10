@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/SeanoChang/cubit/internal/claude"
 	"github.com/spf13/viper"
 )
 
@@ -21,6 +22,9 @@ type ClaudeConfig struct {
 	MemoryModel     string        `yaml:"memory_model"     mapstructure:"memory_model"`
 	RefreshJournals int           `yaml:"refresh_journals" mapstructure:"refresh_journals"`
 	MaxParallel     int           `yaml:"max_parallel"     mapstructure:"max_parallel"`
+	PermissionMode  string        `yaml:"permission_mode"  mapstructure:"permission_mode"`
+	AllowedTools    []string      `yaml:"allowed_tools"    mapstructure:"allowed_tools"`
+	WorkDir         string        `yaml:"work_dir"         mapstructure:"work_dir"`
 }
 
 func DefaultRoot() string {
@@ -87,4 +91,15 @@ func Default(agent string) *Config {
 // AgentDir returns the full path to the active agent's directory.
 func (c *Config) AgentDir() string {
 	return filepath.Join(c.Root, c.Agent)
+}
+
+// RunnerOpts returns a claude.RunnerOpts populated from config.
+func (c *ClaudeConfig) RunnerOpts() claude.RunnerOpts {
+	return claude.RunnerOpts{
+		Model:          c.Model,
+		PermissionMode: c.PermissionMode,
+		AllowedTools:   c.AllowedTools,
+		Timeout:        c.Timeout,
+		WorkDir:        c.WorkDir,
+	}
 }
