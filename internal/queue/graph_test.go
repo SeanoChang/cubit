@@ -320,6 +320,122 @@ func TestRenderMermaid_ContainsNodes(t *testing.T) {
 	}
 }
 
+// --- LeafNodes + ValidateTerminal tests ---
+
+func TestLeafNodes_Linear(t *testing.T) {
+	tasks := []*Task{
+		{ID: 1, Title: "first", DependsOn: []int{}},
+		{ID: 2, Title: "second", DependsOn: []int{1}},
+		{ID: 3, Title: "third", DependsOn: []int{2}},
+	}
+	leaves := LeafNodes(tasks, nil, nil)
+	if len(leaves) != 1 || leaves[0].ID != 3 {
+		t.Errorf("want leaf [3], got %v", ids(leaves))
+	}
+}
+
+func TestLeafNodes_FanOut(t *testing.T) {
+	tasks := []*Task{
+		{ID: 1, Title: "root", DependsOn: []int{}},
+		{ID: 2, Title: "a", DependsOn: []int{1}},
+		{ID: 3, Title: "b", DependsOn: []int{1}},
+		{ID: 4, Title: "c", DependsOn: []int{1}},
+	}
+	leaves := LeafNodes(tasks, nil, nil)
+	if len(leaves) != 3 {
+		t.Errorf("want 3 leaves, got %d: %v", len(leaves), ids(leaves))
+	}
+}
+
+func TestLeafNodes_FanIn(t *testing.T) {
+	tasks := []*Task{
+		{ID: 1, Title: "a", DependsOn: []int{}},
+		{ID: 2, Title: "b", DependsOn: []int{}},
+		{ID: 3, Title: "c", DependsOn: []int{}},
+		{ID: 4, Title: "merge", DependsOn: []int{1, 2, 3}},
+	}
+	leaves := LeafNodes(tasks, nil, nil)
+	if len(leaves) != 1 || leaves[0].ID != 4 {
+		t.Errorf("want leaf [4], got %v", ids(leaves))
+	}
+}
+
+func TestLeafNodes_Diamond(t *testing.T) {
+	tasks := []*Task{
+		{ID: 1, Title: "root", DependsOn: []int{}},
+		{ID: 2, Title: "left", DependsOn: []int{1}},
+		{ID: 3, Title: "right", DependsOn: []int{1}},
+		{ID: 4, Title: "merge", DependsOn: []int{2, 3}},
+	}
+	leaves := LeafNodes(tasks, nil, nil)
+	if len(leaves) != 1 || leaves[0].ID != 4 {
+		t.Errorf("want leaf [4], got %v", ids(leaves))
+	}
+}
+
+func TestLeafNodes_MixedStates(t *testing.T) {
+	done := []*Task{{ID: 1, Title: "done", DependsOn: []int{}}}
+	active := []*Task{{ID: 2, Title: "active", DependsOn: []int{1}}}
+	pending := []*Task{{ID: 3, Title: "pending", DependsOn: []int{2}}}
+	leaves := LeafNodes(pending, active, done)
+	if len(leaves) != 1 || leaves[0].ID != 3 {
+		t.Errorf("want leaf [3], got %v", ids(leaves))
+	}
+}
+
+func TestValidateTerminal_SingleLeaf(t *testing.T) {
+	tasks := []*Task{
+		{ID: 1, Title: "root", DependsOn: []int{}},
+		{ID: 2, Title: "terminal", DependsOn: []int{1}},
+	}
+	if err := ValidateTerminal(tasks, nil, nil); err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+}
+
+func TestValidateTerminal_MultipleLeaves(t *testing.T) {
+	tasks := []*Task{
+		{ID: 1, Title: "root", DependsOn: []int{}},
+		{ID: 2, Title: "branch A", DependsOn: []int{1}},
+		{ID: 3, Title: "branch B", DependsOn: []int{1}},
+	}
+	err := ValidateTerminal(tasks, nil, nil)
+	if err == nil {
+		t.Fatal("expected error for multiple leaves")
+	}
+	if !strings.Contains(err.Error(), "2 terminal nodes") {
+		t.Errorf("error should mention count: %v", err)
+	}
+	if !strings.Contains(err.Error(), "branch A") || !strings.Contains(err.Error(), "branch B") {
+		t.Errorf("error should list leaf names: %v", err)
+	}
+}
+
+func TestValidateTerminal_Empty(t *testing.T) {
+	err := ValidateTerminal(nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected error for empty DAG")
+	}
+}
+
+func TestValidateTerminal_AllDone(t *testing.T) {
+	done := []*Task{
+		{ID: 1, Title: "root", DependsOn: []int{}},
+		{ID: 2, Title: "terminal", DependsOn: []int{1}},
+	}
+	if err := ValidateTerminal(nil, nil, done); err != nil {
+		t.Errorf("expected no error for all-done DAG, got: %v", err)
+	}
+}
+
+func ids(tasks []*Task) []int {
+	var out []int
+	for _, t := range tasks {
+		out = append(out, t.ID)
+	}
+	return out
+}
+
 func TestRenderASCII_ContainsSections(t *testing.T) {
 	nodes := []*GraphNode{
 		{Task: &Task{ID: 1, Title: "root", Mode: "once", DependsOn: []int{}}, Status: StatusDone},

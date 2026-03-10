@@ -34,6 +34,7 @@ func NewRegistry(q *queue.Queue, cfg *config.Config) *Registry {
 	r.registerLog()
 	r.registerGraph()
 	r.registerStatus()
+	r.registerDrain()
 	return r
 }
 

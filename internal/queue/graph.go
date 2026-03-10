@@ -282,6 +282,44 @@ func GraphComplete(pending []*Task, active []*Task, done []*Task) bool {
 	return len(pending) == 0 && len(active) == 0
 }
 
+// LeafNodes returns all tasks that no other task depends on.
+func LeafNodes(pending []*Task, active []*Task, done []*Task) []*Task {
+	all := append(append(pending, active...), done...)
+	hasDependents := make(map[int]bool)
+	for _, t := range all {
+		for _, dep := range t.DependsOn {
+			hasDependents[dep] = true
+		}
+	}
+	var leaves []*Task
+	for _, t := range all {
+		if !hasDependents[t.ID] {
+			leaves = append(leaves, t)
+		}
+	}
+	sort.Slice(leaves, func(i, j int) bool {
+		return leaves[i].ID < leaves[j].ID
+	})
+	return leaves
+}
+
+// ValidateTerminal checks that the DAG has exactly one terminal node (leaf).
+func ValidateTerminal(pending, active, done []*Task) error {
+	leaves := LeafNodes(pending, active, done)
+	if len(leaves) == 0 {
+		return fmt.Errorf("no tasks in DAG")
+	}
+	if len(leaves) > 1 {
+		var lines []string
+		for _, t := range leaves {
+			lines = append(lines, fmt.Sprintf("  %03d: %s", t.ID, t.Title))
+		}
+		return fmt.Errorf("DAG has %d terminal nodes — add a summary node that depends on all of them:\n%s",
+			len(leaves), strings.Join(lines, "\n"))
+	}
+	return nil
+}
+
 // DetectCycle checks for circular dependencies using DFS coloring.
 // Returns an error if a cycle is found.
 func DetectCycle(nodes []*GraphNode) error {

@@ -413,6 +413,51 @@ func TestGraphEmpty(t *testing.T) {
 	}
 }
 
+// --- cubit_drain tests ---
+
+func TestDrainRejectsMultipleLeaves(t *testing.T) {
+	srv, _ := setupTest(t)
+	srv.q.Create("branch A", queue.CreateOptions{})
+	srv.q.Create("branch B", queue.CreateOptions{})
+
+	result := callTool(t, srv, "cubit_drain", nil)
+	if !result.IsError {
+		t.Fatal("expected error for multiple terminal nodes")
+	}
+	text := result.Content[0].Text
+	if !strings.Contains(text, "2 terminal nodes") {
+		t.Errorf("error should mention count: %s", text)
+	}
+	if !strings.Contains(text, "branch A") || !strings.Contains(text, "branch B") {
+		t.Errorf("error should list leaf names: %s", text)
+	}
+}
+
+func TestDrainRejectsEmpty(t *testing.T) {
+	srv, _ := setupTest(t)
+	result := callTool(t, srv, "cubit_drain", nil)
+	if !result.IsError {
+		t.Fatal("expected error for empty DAG")
+	}
+	if !strings.Contains(result.Content[0].Text, "no tasks") {
+		t.Errorf("expected 'no tasks' error: %s", result.Content[0].Text)
+	}
+}
+
+func TestDrainAcceptsSingleTerminal(t *testing.T) {
+	srv, _ := setupTest(t)
+	srv.q.Create("root", queue.CreateOptions{})
+	srv.q.Create("terminal", queue.CreateOptions{DependsOn: []int{1}})
+
+	result := callTool(t, srv, "cubit_drain", nil)
+	// Will try to spawn cubit run --once — may fail if binary not in PATH
+	// but validation should pass (no IsError from validation)
+	text := result.Content[0].Text
+	if result.IsError && strings.Contains(text, "terminal nodes") {
+		t.Errorf("validation should pass for single terminal: %s", text)
+	}
+}
+
 // --- cubit_status tests ---
 
 func TestStatus(t *testing.T) {
