@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"context"
@@ -12,6 +12,8 @@ var refreshCmd = &cobra.Command{
 	Use:   "refresh",
 	Short: "Rewrite brief.md from scratch using recent journals and log",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := getCfg()
+
 		fmt.Println("Refreshing brief.md from journals + log...")
 
 		if err := brief.RunRefresh(context.Background(), cfg.AgentDir(), cfg.Claude.MemoryRunnerOpts(), cfg.Claude.RefreshJournals); err != nil {

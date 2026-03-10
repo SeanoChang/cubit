@@ -1,4 +1,4 @@
-package cmd
+package task
 
 import (
 	"fmt"
@@ -10,6 +10,8 @@ var queueCmd = &cobra.Command{
 	Use:   "queue",
 	Short: "List pending tasks",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		q := getQ()
+
 		active, err := q.Active()
 		if err != nil {
 			return err

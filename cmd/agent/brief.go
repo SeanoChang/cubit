@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"fmt"
@@ -12,6 +12,8 @@ var briefCmd = &cobra.Command{
 	Use:   "brief",
 	Short: "Show brief injection sections and token estimates",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := getCfg()
+
 		sections := brief.Sections(cfg.AgentDir())
 
 		total := 0

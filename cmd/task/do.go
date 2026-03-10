@@ -1,4 +1,4 @@
-package cmd
+package task
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ var doCmd = &cobra.Command{
 	Use:   "do",
 	Short: "Pop the next ready task (or all with --all)",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		q := getQ()
 		all, _ := cmd.Flags().GetBool("all")
 
 		if all {

@@ -1,4 +1,4 @@
-package cmd
+package task
 
 import (
 	"fmt"
@@ -13,6 +13,8 @@ var todoCmd = &cobra.Command{
 	Short: "Create a new task in the queue",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		q := getQ()
+
 		ctx, _ := cmd.Flags().GetString("context")
 		file, _ := cmd.Flags().GetString("file")
 		mode, _ := cmd.Flags().GetString("mode")

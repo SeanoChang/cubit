@@ -12,7 +12,10 @@ go build -o cubit .
 
 ## Project Layout
 
-- `cmd/` — Cobra commands (one file per command/subcommand)
+- `cmd/` — Cobra root + core commands (init, config, version, update)
+- `cmd/task/` — Task management (todo, queue, do, done, requeue, log, graph)
+- `cmd/exec/` — Execution (prompt, run)
+- `cmd/agent/` — Agent state (identity, memory, status, brief, refresh)
 - `internal/config/` — Config types + loading via Viper
 - `main.go` — Entry point
 

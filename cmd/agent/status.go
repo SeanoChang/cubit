@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"fmt"
@@ -11,6 +11,9 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show agent status overview",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := getCfg()
+		q := getQ()
+
 		fmt.Printf("Agent:   %s\n", cfg.Agent)
 
 		active, err := q.Active()

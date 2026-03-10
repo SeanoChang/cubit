@@ -1,4 +1,4 @@
-package cmd
+package exec
 
 import (
 	"context"
@@ -21,6 +21,9 @@ var runCmd = &cobra.Command{
 	Short: "Resolve the task DAG: fan-out ready tasks, fan-in at dependencies",
 	Long:  "Concurrent DAG executor. Finds all ready tasks, runs them in parallel (up to --max-parallel), waits for completions to unlock dependents. Stops when graph is fully resolved or deadlocked.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := getCfg()
+		q := getQ()
+
 		once, _ := cmd.Flags().GetBool("once")
 		cooldown, _ := cmd.Flags().GetDuration("cooldown")
 		noMemory, _ := cmd.Flags().GetBool("no-memory")
@@ -168,17 +171,16 @@ var runCmd = &cobra.Command{
 }
 
 func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) queue.TaskResult {
-	agentDir := cfg.AgentDir()
+	c := getCfg()
+	agentDir := c.AgentDir()
 	scratchDir := filepath.Join(agentDir, "scratch")
 
-	// Build brief with upstream output paths for fan-in nodes
 	injection := brief.BuildWithUpstream(agentDir, task.DependsOn)
 	full := injection + "\n\n---\n\nExecute the active task."
 
-	// Resolve model: task override → config default
 	model := task.Model
 	if model == "" {
-		model = cfg.Claude.Model
+		model = c.Claude.Model
 	}
 
 	var lastErr error
@@ -197,7 +199,7 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 			fmt.Fprintf(os.Stderr, "  %03d: retry %d/%d\n", task.ID, attempt, maxRetries)
 		}
 
-		opts := cfg.Claude.RunnerOpts()
+		opts := c.Claude.RunnerOpts()
 		opts.Model = model
 		output, err := claude.Prompt(ctx, full, opts)
 		if err != nil {
@@ -205,7 +207,6 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 			continue
 		}
 
-		// Success
 		if err := queue.WriteTaskOutput(scratchDir, task.ID, output); err != nil {
 			fmt.Fprintf(os.Stderr, "  warning: write output %03d: %v\n", task.ID, err)
 		}
@@ -217,7 +218,6 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 		}
 	}
 
-	// All retries exhausted
 	if err := queue.WriteTaskOutput(scratchDir, task.ID, ""); err != nil {
 		fmt.Fprintf(os.Stderr, "  warning: write output %03d: %v\n", task.ID, err)
 	}
@@ -229,17 +229,17 @@ func executeWithRetry(ctx context.Context, task *queue.Task, maxRetries int) que
 	}
 }
 
-// executeLoop runs a loop-mode task: iterate until goal met, max_iterations, or cancellation.
 func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.TaskResult {
-	agentDir := cfg.AgentDir()
+	c := getCfg()
+	agentDir := c.AgentDir()
 	scratchDir := filepath.Join(agentDir, "scratch")
 
 	model := task.Model
 	if model == "" {
-		model = cfg.Claude.Model
+		model = c.Claude.Model
 	}
 
-	maxIter := task.MaxIterations // 0 = unlimited
+	maxIter := task.MaxIterations
 
 	for {
 		select {
@@ -255,7 +255,6 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 
 		iteration := queue.IncrementIteration(scratchDir, task.ID)
 
-		// Check max_iterations
 		if maxIter > 0 && iteration > maxIter {
 			queue.ClearIteration(scratchDir, task.ID)
 			return queue.TaskResult{
@@ -271,33 +270,29 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 		}
 		fmt.Println()
 
-		// Build loop injection
 		injection := brief.BuildLoopInjection(agentDir, task.Program, task.Goal, iteration, maxIter)
 		full := injection + "\n\n---\n\nExecute the next iteration of the active loop task."
 
-		opts := cfg.Claude.RunnerOpts()
+		opts := c.Claude.RunnerOpts()
 		opts.Model = model
 		output, err := claude.Prompt(ctx, full, opts)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  %03d: iteration %d error: %v\n", task.ID, iteration, err)
-			continue // retry next iteration on transient errors
+			continue
 		}
 
-		// Write output (overwrite each iteration — latest output wins)
 		if writeErr := queue.WriteTaskOutput(scratchDir, task.ID, output); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "  warning: write output %03d: %v\n", task.ID, writeErr)
 		}
 
 		fmt.Printf("\n%s\n\n", output)
 
-		// Memory pass between iterations
 		if !noMemory {
-			if memErr := brief.RunMemoryPass(ctx, agentDir, output, cfg.Claude.MemoryRunnerOpts()); memErr != nil {
+			if memErr := brief.RunMemoryPass(ctx, agentDir, output, c.Claude.MemoryRunnerOpts()); memErr != nil {
 				fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", memErr)
 			}
 		}
 
-		// Check goal
 		if task.Goal != "" && queue.GoalMet(output) {
 			queue.ClearIteration(scratchDir, task.ID)
 			return queue.TaskResult{
@@ -311,9 +306,11 @@ func executeLoop(ctx context.Context, task *queue.Task, noMemory bool) queue.Tas
 }
 
 func handleResult(result queue.TaskResult, noMemory bool) {
+	c := getCfg()
+	q := getQ()
+
 	if result.Err != nil {
 		fmt.Fprintf(os.Stderr, "✗ %03d: %s\n", result.TaskID, result.Err)
-		// Requeue interrupted tasks so they can resume
 		if result.Err == context.Canceled || result.Err == context.DeadlineExceeded {
 			if err := q.RequeueByID(result.TaskID); err != nil {
 				fmt.Fprintf(os.Stderr, "  requeue error %03d: %v\n", result.TaskID, err)
@@ -337,7 +334,7 @@ func handleResult(result queue.TaskResult, noMemory bool) {
 	fmt.Printf("✓ %03d\n", result.TaskID)
 
 	if !noMemory {
-		if err := brief.RunMemoryPass(context.Background(), cfg.AgentDir(), result.Output, cfg.Claude.MemoryRunnerOpts()); err != nil {
+		if err := brief.RunMemoryPass(context.Background(), c.AgentDir(), result.Output, c.Claude.MemoryRunnerOpts()); err != nil {
 			fmt.Fprintf(os.Stderr, "  warning: memory pass failed: %v\n", err)
 		}
 	}

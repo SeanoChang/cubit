@@ -1,4 +1,4 @@
-package cmd
+package exec
 
 import (
 	"context"
@@ -14,6 +14,8 @@ var promptCmd = &cobra.Command{
 	Short: "Single-shot prompt with brief injection and memory pass",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := getCfg()
+
 		injection := brief.Build(cfg.AgentDir())
 		full := injection + "\n\n---\n\n" + args[0]
 

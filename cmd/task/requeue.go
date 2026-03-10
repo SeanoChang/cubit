@@ -1,4 +1,4 @@
-package cmd
+package task
 
 import (
 	"fmt"
@@ -12,6 +12,8 @@ var requeueCmd = &cobra.Command{
 	Short: "Return an active task to the queue",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		q := getQ()
+
 		if len(args) == 1 {
 			id, err := strconv.Atoi(args[0])
 			if err != nil {

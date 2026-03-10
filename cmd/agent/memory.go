@@ -1,4 +1,4 @@
-package cmd
+package agent
 
 import (
 	"fmt"
@@ -77,5 +77,5 @@ func memoryShowRun(cmd *cobra.Command, args []string) error {
 }
 
 func notesPath() string {
-	return filepath.Join(cfg.AgentDir(), "memory", "MEMORY.md")
+	return filepath.Join(getCfg().AgentDir(), "memory", "MEMORY.md")
 }

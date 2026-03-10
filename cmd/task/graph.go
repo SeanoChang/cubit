@@ -1,4 +1,4 @@
-package cmd
+package task
 
 import (
 	"fmt"
@@ -16,6 +16,8 @@ var graphCmd = &cobra.Command{
 With a task ID: print a subgraph view for that task (Mermaid by default, --ascii for tree).`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		q := getQ()
+
 		statusFilter, _ := cmd.Flags().GetString("status")
 		modeFilter, _ := cmd.Flags().GetString("mode")
 		ascii, _ := cmd.Flags().GetBool("ascii")

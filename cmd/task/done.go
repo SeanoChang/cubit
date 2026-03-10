@@ -1,4 +1,4 @@
-package cmd
+package task
 
 import (
 	"fmt"
@@ -13,6 +13,8 @@ var doneCmd = &cobra.Command{
 	Short: "Complete an active task",
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		q := getQ()
+
 		// Parse optional task ID from first arg
 		var taskID int
 		var summary string
