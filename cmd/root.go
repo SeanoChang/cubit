@@ -17,9 +17,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "cubit",
-	Short: "Control plane for a single agent instance",
-	Long:  "Cubit manages identity, sessions, tasks, and memory for an agent.",
+	Use:     "cubit",
+	Short:   "Control plane for a single agent instance",
+	Long:    "Cubit manages identity, sessions, tasks, and memory for an agent.",
+	Version: Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		cfg, err = config.Load()
@@ -34,6 +35,8 @@ var rootCmd = &cobra.Command{
 // init registers the full command tree in one place.
 // Individual commands are defined in their own files.
 func init() {
+	rootCmd.SetVersionTemplate(fmt.Sprintf("cubit %s (commit: %s, built: %s)\n", Version, Commit, Date))
+
 	// cubit version
 	rootCmd.AddCommand(versionCmd)
 
@@ -102,6 +105,9 @@ func init() {
 	graphCmd.Flags().String("mode", "", "Filter by mode: once or loop")
 	graphCmd.Flags().Bool("ascii", false, "Render subgraph as ASCII tree instead of Mermaid (only with task ID)")
 	rootCmd.AddCommand(graphCmd)
+
+	// cubit update
+	rootCmd.AddCommand(updateCmd)
 }
 
 func Execute() {
