@@ -1,6 +1,6 @@
 # Cubit
 
-Control plane for a single AI agent instance. Manages identity, tasks, execution, and memory.
+Filesystem CLI for agent workspaces. Scaffolds directories, reports status, and archives to nark. Execution is handled by Claude Code's native subagents; the outer loop is Keel's job.
 
 ## Install
 
@@ -18,163 +18,99 @@ cubit update
 ## Quick Start
 
 ```bash
-# Initialize a new agent
+# Initialize a new agent workspace
 cubit init noah
 
-# Create tasks
-cubit todo "implement auth system"
-cubit todo "write tests" --depends-on 1
-cubit todo "architecture sweep" --mode loop --goal "val_bpb < 0.95" --max-iterations 100
+# Check workspace status
+cubit status
 
-# View the task graph
-cubit graph
+# Edit goals
+cubit edit goals
 
-# Run the DAG executor
-cubit run
+# Run the agent (via Claude Code)
+cd ~/.ark/noah && claude --agent noah -p "$(cat PROGRAM.md)"
+
+# Archive scratch + log to nark
+cubit archive
 ```
 
 ## Commands
 
-### Core
-
 | Command | Description |
 |---------|-------------|
-| `cubit init <agent>` | Initialize agent workspace |
-| `cubit config show` | Print current config |
+| `cubit init <agent>` | Scaffold agent workspace at `~/.ark/<agent>/` |
+| `cubit status` | Show goals, memory token count, log tail |
+| `cubit edit <target>` | Open agent file in `$EDITOR` (goals, memory, program, fluctlight, settings) |
+| `cubit archive` | Push log + scratch to nark, clean scratch |
+| `cubit migrate` | Migrate v0.x workspace to v1.0 layout |
 | `cubit version` | Show version info |
 | `cubit update` | Self-update from GitHub releases |
 
-### Task Queue
-
-| Command | Description |
-|---------|-------------|
-| `cubit todo <desc>` | Create a new task |
-| `cubit queue` | List pending tasks |
-| `cubit do [--all]` | Pop next ready task(s) |
-| `cubit done [id] [summary]` | Complete a task |
-| `cubit requeue [id]` | Return active task to queue |
-| `cubit log <msg>` | Append observation to log |
-| `cubit graph` | Print task DAG with status |
-
-### Execution
-
-| Command | Description |
-|---------|-------------|
-| `cubit prompt <msg>` | Single-shot prompt with brief injection |
-| `cubit run` | Concurrent DAG executor |
-
-### Observability
-
-| Command | Description |
-|---------|-------------|
-| `cubit status` | Agent state, queue depth, brief size |
-| `cubit brief` | Show brief sections + token estimates |
-| `cubit refresh` | Rewrite brief.md from journals + log |
-
-### Identity & Memory
-
-| Command | Description |
-|---------|-------------|
-| `cubit identity list\|show\|set` | Manage identity files |
-| `cubit memory show\|append\|edit` | Agent's durable notes |
-
-## Task Modes
-
-**once** — Single-shot execution with retry (default).
-
-**loop** — Iterates until goal met or `max_iterations` reached. Each iteration re-injects `program.md`, runs a memory pass, and appends to `results.tsv`. The agent signals completion by outputting `GOAL_MET`.
+### Init Flags
 
 ```bash
-cubit todo "optimize model" \
-  --mode loop \
-  --program sweep.md \
-  --goal "val_bpb < 0.95" \
-  --max-iterations 100 \
-  --branch noah/sweep
+cubit init noah                          # scaffold new workspace
+cubit init noah --force                  # re-initialize existing workspace
+cubit init noah --import-identity id.md  # import an existing FLUCTLIGHT.md
 ```
 
-## DAG Execution
+## Agent Workspace Layout
 
-Tasks can declare dependencies with `--depends-on`. The executor fans out independent tasks in parallel and fans in at dependency boundaries.
-
-```bash
-cubit todo "data pipeline"
-cubit todo "train model" --depends-on 1
-cubit todo "evaluate model" --depends-on 1
-cubit todo "write report" --depends-on 2,3
-
-cubit run --max-parallel 8
-```
+Each agent workspace is a git repo under `~/.ark/`:
 
 ```
-001 [once] data pipeline              ✓ ready
-002 [once] train model                ⏳ waiting on [001]
-003 [once] evaluate model             ⏳ waiting on [001]
-004 [once] write report               ⏳ waiting on [002, 003]
+~/.ark/<agent>/
+├── .git/
+├── .gitignore
+├── .claude/
+│   ├── settings.json          # agent-specific permissions (user-editable)
+│   └── agents/
+│       └── <agent>.md         # agent definition + boot protocol
+├── FLUCTLIGHT.md              # identity (immutable by agent)
+├── PROGRAM.md                 # how to work (human-authored)
+├── GOALS.md                   # what to work on (agent removes completed)
+├── MEMORY.md                  # working context (agent-maintained)
+├── log.md                     # append-only accomplishment history
+└── scratch/                   # ephemeral workspace
+    └── <task-name>/           # one dir per task
 ```
-
-## Architecture
-
-```
-~/.ark/cubit/
-├── config.yaml
-└── <agent>/
-    ├── identity/
-    │   ├── FLUCTLIGHT.md       # AI persona
-    │   ├── USER.md             # User identity
-    │   └── GOALS.md            # Objectives
-    ├── queue/
-    │   ├── 001-task-title.md   # Pending tasks
-    │   ├── .doing/             # Active tasks
-    │   └── done/               # Completed tasks
-    ├── scratch/                # Working files
-    └── memory/
-        ├── MEMORY.md           # Agent's durable notes
-        ├── brief.md            # Session context (auto-managed)
-        ├── log.md              # Task completion log
-        ├── results.tsv         # Experiment results
-        └── sessions/           # Session journals
-```
-
-**Brief injection order:** FLUCTLIGHT -> USER -> GOALS -> brief.md -> active task -> scratch -> upstream outputs -> user message
 
 ## Config
 
-`~/.ark/cubit/config.yaml`:
+`~/.ark/config.yaml`:
 
 ```yaml
-root: ~/.ark/cubit
 agent: noah
-claude:
-  model: claude-opus-4-6
-  memory_model: claude-haiku-4-5-20251001
-  timeout: 30m
-  max_parallel: 0          # 0 = NumCPU * 4
-  permission_mode: ""
-  allowed_tools: []
-  work_dir: ""
+root: ~/.ark
 ```
+
+## Migration from v0.x
+
+If upgrading from cubit v0.x (`~/.ark/cubit/<agent>/`):
+
+```bash
+cubit migrate
+```
+
+This moves agent data to the new layout, merges `brief.md` into `MEMORY.md`, and backs up the old workspace.
 
 ## Project Layout
 
 ```
 cmd/                    # Cobra commands
-  task/                 # todo, queue, do, done, requeue, log, graph
-  exec/                 # prompt, run
-  agent/                # identity, memory, status, brief, refresh
+  root.go               # Root command, wires all subcommands
+  init.go               # Scaffold new agent workspace
+  status.go             # Show workspace status
+  edit.go               # Open agent files in $EDITOR
+  archive.go            # Archive to nark, clean scratch
+  migrate.go            # v0.x → v1.0 migration
+  version.go            # Version info
+  update.go             # Self-update
 internal/
   config/               # Config types + Viper loading
-  claude/               # Claude CLI wrapper
-  queue/                # Task queue, graph, executor helpers
-  brief/                # Brief injection + memory pass
-  scaffold/             # Agent workspace initialization
+  scaffold/             # Agent workspace scaffolding
   updater/              # Self-update from GitHub releases
 main.go                 # Entry point
-docs/
-  v0.1/                 # M0-M1: Skeleton + init
-  v0.2/                 # M2-M5: Task queue + runner
-  v0.3/                 # M6-M9: Task graph + DAG executor
-  v0.4/                 # M10-M12: Loop execution + memory
 ```
 
 ## Build
