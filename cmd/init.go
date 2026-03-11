@@ -30,23 +30,24 @@ var initCmd = &cobra.Command{
 			}
 		}
 
-		agentDir := filepath.Join(cfg.Root, agent)
+		root := cfg.Root
+		agentDir := filepath.Join(root, agent)
 		force, _ := cmd.Flags().GetBool("force")
 
-		created, err := scaffold.Init(cfg.Root, agent)
+		created, err := scaffold.Init(root, agent, force)
 		if err != nil {
 			return fmt.Errorf("initializing agent: %w", err)
 		}
 
-		if !created && !force {
-			fmt.Printf("Agent %q already initialized at %s\n", agent, agentDir)
+		if !created {
+			fmt.Printf("Agent %q already exists at %s (use --force to re-initialize)\n", agent, agentDir)
 			return nil
 		}
 
-		if created {
-			fmt.Printf("Initialized agent %q at %s\n", agent, agentDir)
+		if force {
+			fmt.Printf("Re-initialized agent %q at %s\n", agent, agentDir)
 		} else {
-			fmt.Printf("Re-running setup for agent %q at %s\n", agent, agentDir)
+			fmt.Printf("Initialized agent %q at %s\n", agent, agentDir)
 		}
 
 		// --import-identity FILE: copy an existing FLUCTLIGHT.md
@@ -56,22 +57,18 @@ var initCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("reading identity file: %w", err)
 			}
-			dest := filepath.Join(agentDir, "identity", "FLUCTLIGHT.md")
+			dest := filepath.Join(agentDir, "FLUCTLIGHT.md")
 			if err := os.WriteFile(dest, data, 0o644); err != nil {
 				return err
 			}
-			fmt.Printf("  imported %s → %s\n", importPath, dest)
-			return nil
-		}
-
-		// --skip-onboard: scaffold only, no interactive setup
-		skipOnboard, _ := cmd.Flags().GetBool("skip-onboard")
-		if !skipOnboard {
-			if err := scaffold.RunSetup(agentDir, agent); err != nil {
-				return fmt.Errorf("setup: %w", err)
-			}
+			fmt.Printf("  imported %s → FLUCTLIGHT.md\n", importPath)
 		}
 
 		return nil
 	},
+}
+
+func init() {
+	initCmd.Flags().String("import-identity", "", "Import an existing FLUCTLIGHT.md file")
+	initCmd.Flags().Bool("force", false, "Re-initialize an existing agent workspace")
 }
