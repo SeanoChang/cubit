@@ -29,7 +29,7 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestAgentDir(t *testing.T) {
 	cfg := &Config{Agent: "noah", Root: "/tmp/ark"}
-	want := "/tmp/ark/noah"
+	want := "/tmp/ark/agents-home/noah"
 	got := cfg.AgentDir()
 	if got != want {
 		t.Errorf("AgentDir() = %q, want %q", got, want)

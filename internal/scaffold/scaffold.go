@@ -14,7 +14,7 @@ import (
 // Returns (true, nil) if created, (false, nil) if already exists.
 // If force is true, recreates .claude/ config files for an existing workspace.
 func Init(root, agent string, force bool) (bool, error) {
-	agentDir := filepath.Join(root, agent)
+	agentDir := filepath.Join(root, "agents-home", agent)
 
 	if _, err := os.Stat(agentDir); err == nil {
 		if !force {
@@ -95,9 +95,9 @@ tools: Agent, Read, Write, Edit, Bash, Grep, Glob
 
 # Boot Protocol
 
-1. Read ~/.ark/%s/FLUCTLIGHT.md — this is your identity. Never modify it.
-2. Read ~/.ark/%s/GOALS.md — these are your current objectives.
-3. Read ~/.ark/%s/MEMORY.md — this is your working context from previous sessions.
+1. Read ~/.ark/agents-home/%s/FLUCTLIGHT.md — this is your identity. Never modify it.
+2. Read ~/.ark/agents-home/%s/GOALS.md — these are your current objectives.
+3. Read ~/.ark/agents-home/%s/MEMORY.md — this is your working context from previous sessions.
 4. Work on the highest-priority incomplete goal.
 5. Use subagents for parallel research or independent subtasks.
 6. When you complete meaningful work:

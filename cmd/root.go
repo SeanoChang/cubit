@@ -24,10 +24,15 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		// Warn if old v0.x layout detected
-		if cmd.Name() != "migrate" && cfg.IsLegacyLayout() {
-			fmt.Fprintf(os.Stderr, "Warning: Legacy v0.x workspace detected at %s\n", cfg.LegacyAgentDir())
-			fmt.Fprintf(os.Stderr, "  Run 'cubit migrate' to upgrade to v1.0 layout.\n\n")
+		// Warn if old layouts detected
+		if cmd.Name() != "migrate" {
+			if cfg.IsLegacyLayout() {
+				fmt.Fprintf(os.Stderr, "Warning: Legacy v0.x workspace detected at %s\n", cfg.LegacyAgentDir())
+				fmt.Fprintf(os.Stderr, "  Run 'cubit migrate' to upgrade.\n\n")
+			} else if cfg.IsFlatLayout() {
+				fmt.Fprintf(os.Stderr, "Warning: Flat v1.0 workspace detected at %s\n", cfg.FlatAgentDir())
+				fmt.Fprintf(os.Stderr, "  Run 'cubit migrate' to move to agents-home layout.\n\n")
+			}
 		}
 
 		return nil

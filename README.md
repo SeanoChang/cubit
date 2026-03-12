@@ -28,7 +28,7 @@ cubit status
 cubit edit goals
 
 # Run the agent (via Claude Code)
-cd ~/.ark/noah && claude --agent noah -p "$(cat PROGRAM.md)"
+cd ~/.ark/agents-home/noah && claude --agent noah -p "$(cat PROGRAM.md)"
 
 # Archive scratch + log to nark
 cubit archive
@@ -38,11 +38,11 @@ cubit archive
 
 | Command | Description |
 |---------|-------------|
-| `cubit init <agent>` | Scaffold agent workspace at `~/.ark/<agent>/` |
+| `cubit init <agent>` | Scaffold agent workspace at `~/.ark/agents-home/<agent>/` |
 | `cubit status` | Show goals, memory token count, log tail |
 | `cubit edit <target>` | Open agent file in `$EDITOR` (goals, memory, program, fluctlight, settings) |
 | `cubit archive` | Push log + scratch to nark, truncate log, clean scratch |
-| `cubit migrate` | Migrate v0.x workspace to v1.0 layout |
+| `cubit migrate [agents...]` | Migrate workspaces to agents-home layout |
 | `cubit version` | Show version info |
 | `cubit update` | Self-update from GitHub releases |
 
@@ -63,10 +63,10 @@ cubit archive --keep-log 100   # keep last 100 log lines instead
 
 ## Agent Workspace Layout
 
-Each agent workspace is a git repo under `~/.ark/`:
+Each agent workspace is a git repo under `~/.ark/agents-home/`:
 
 ```
-~/.ark/<agent>/
+~/.ark/agents-home/<agent>/
 ├── .git/
 ├── .gitignore
 ├── .claude/
@@ -93,13 +93,14 @@ root: ~/.ark
 
 ## Migration from v0.x
 
-If upgrading from cubit v0.x (`~/.ark/cubit/<agent>/`):
+Supports migrating from v0.x (`~/.ark/cubit/<agent>/`) or flat v1.0 (`~/.ark/<agent>/`):
 
 ```bash
-cubit migrate
+cubit migrate noah scout    # migrate specific agents
+cubit migrate               # migrate the default agent from config
 ```
 
-This moves agent data to the new layout, merges `brief.md` into `MEMORY.md`, and backs up the old workspace.
+Flat v1.0 workspaces are moved directly. V0.x workspaces are scaffolded fresh with data copied over and old directories backed up.
 
 ## Project Layout
 

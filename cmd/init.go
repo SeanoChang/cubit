@@ -31,7 +31,7 @@ var initCmd = &cobra.Command{
 		}
 
 		root := cfg.Root
-		agentDir := filepath.Join(root, agent)
+		agentDir := filepath.Join(root, "agents-home", agent)
 		force, _ := cmd.Flags().GetBool("force")
 
 		created, err := scaffold.Init(root, agent, force)

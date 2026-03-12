@@ -19,7 +19,7 @@ func TestInit(t *testing.T) {
 		t.Fatal("Init() returned created=false, want true")
 	}
 
-	agentDir := filepath.Join(root, agent)
+	agentDir := filepath.Join(root, "agents-home", agent)
 
 	// Check directories exist
 	dirs := []string{
@@ -110,7 +110,7 @@ func TestInitForce(t *testing.T) {
 	Init(root, agent, false)
 
 	// Corrupt agent.md
-	agentMDPath := filepath.Join(root, agent, ".claude", "agents", "testbot.md")
+	agentMDPath := filepath.Join(root, "agents-home", agent, ".claude", "agents", "testbot.md")
 	os.WriteFile(agentMDPath, []byte("corrupted"), 0o644)
 
 	// Force re-init

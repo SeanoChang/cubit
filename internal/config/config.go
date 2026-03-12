@@ -67,6 +67,18 @@ func Default(agent string) *Config {
 }
 
 func (c *Config) AgentDir() string {
+	return filepath.Join(c.Root, "agents-home", c.Agent)
+}
+
+// IsFlatLayout returns true if the pre-agents-home v1.0 layout exists at ~/.ark/<agent>/.
+func (c *Config) IsFlatLayout() bool {
+	flatDir := filepath.Join(c.Root, c.Agent)
+	_, err := os.Stat(filepath.Join(flatDir, "FLUCTLIGHT.md"))
+	return err == nil
+}
+
+// FlatAgentDir returns the old flat v1.0 agent directory path (~/.ark/<agent>/).
+func (c *Config) FlatAgentDir() string {
 	return filepath.Join(c.Root, c.Agent)
 }
 
