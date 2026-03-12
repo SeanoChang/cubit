@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -48,11 +49,15 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("unmarshaling config: %w", err)
 	}
 
+	// Expand ~ prefix — Go's filepath.Join doesn't expand tildes
+	if strings.HasPrefix(cfg.Root, "~/") {
+		cfg.Root = filepath.Join(home, cfg.Root[2:])
+	} else if cfg.Root == "~" {
+		cfg.Root = home
+	}
+
 	// Normalize root — if it's the old path, update to new default
 	if cfg.Root == oldRoot {
-		cfg.Root = DefaultRoot()
-	}
-	if cfg.Root == "~/.ark" {
 		cfg.Root = DefaultRoot()
 	}
 
