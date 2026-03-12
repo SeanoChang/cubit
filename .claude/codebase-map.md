@@ -23,7 +23,7 @@ cubit/
 │   ├── init.go              # `cubit init` — scaffold agent workspace
 │   ├── status.go            # `cubit status` — goals, memory tokens, log tail
 │   ├── edit.go              # `cubit edit` — open agent files in $EDITOR
-│   ├── archive.go           # `cubit archive` — log + scratch → nark, clean scratch
+│   ├── archive.go           # `cubit archive` — log + scratch → nark, truncate log, clean scratch
 │   └── migrate.go           # `cubit migrate` — v0.x → v1.0 workspace migration
 ├── internal/
 │   ├── config/

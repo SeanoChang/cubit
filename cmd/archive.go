@@ -67,12 +67,21 @@ var archiveCmd = &cobra.Command{
 		narkID := strings.TrimSpace(string(output))
 		fmt.Printf("Archived log + %d scratch files to nark: %s\n", fileCount, narkID)
 
-		// Append log entry
-		logEntry := fmt.Sprintf("\n[%s] Archived log + %d scratch files to nark: %s\n", date, fileCount, narkID)
-		f, appendErr := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
-		if appendErr == nil {
-			f.WriteString(logEntry)
-			f.Close()
+		// Truncate log.md — keep last N lines + append archive entry
+		keepLines, _ := cmd.Flags().GetInt("keep-log")
+		if hasLog {
+			lines := strings.Split(strings.TrimRight(string(logData), "\n"), "\n")
+			var kept []string
+			if len(lines) > keepLines {
+				kept = lines[len(lines)-keepLines:]
+			} else {
+				kept = lines
+			}
+			kept = append(kept, fmt.Sprintf("[%s] Archived log + %d scratch files to nark: %s", date, fileCount, narkID))
+			os.WriteFile(logPath, []byte("# Log\n"+strings.Join(kept, "\n")+"\n"), 0o644)
+			if len(lines) > keepLines {
+				fmt.Printf("Truncated log.md (kept last %d of %d lines)\n", keepLines, len(lines))
+			}
 		}
 
 		// Clean scratch/ (keep .gitkeep, remove everything else)
@@ -92,4 +101,8 @@ var archiveCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func init() {
+	archiveCmd.Flags().Int("keep-log", 50, "Number of recent log lines to keep after archive")
 }

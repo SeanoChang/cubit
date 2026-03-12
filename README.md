@@ -41,7 +41,7 @@ cubit archive
 | `cubit init <agent>` | Scaffold agent workspace at `~/.ark/<agent>/` |
 | `cubit status` | Show goals, memory token count, log tail |
 | `cubit edit <target>` | Open agent file in `$EDITOR` (goals, memory, program, fluctlight, settings) |
-| `cubit archive` | Push log + scratch to nark, clean scratch |
+| `cubit archive` | Push log + scratch to nark, truncate log, clean scratch |
 | `cubit migrate` | Migrate v0.x workspace to v1.0 layout |
 | `cubit version` | Show version info |
 | `cubit update` | Self-update from GitHub releases |
@@ -52,6 +52,13 @@ cubit archive
 cubit init noah                          # scaffold new workspace
 cubit init noah --force                  # re-initialize existing workspace
 cubit init noah --import-identity id.md  # import an existing FLUCTLIGHT.md
+```
+
+### Archive Flags
+
+```bash
+cubit archive                  # archive log + scratch to nark, keep last 50 log lines
+cubit archive --keep-log 100   # keep last 100 log lines instead
 ```
 
 ## Agent Workspace Layout
@@ -102,7 +109,7 @@ cmd/                    # Cobra commands
   init.go               # Scaffold new agent workspace
   status.go             # Show workspace status
   edit.go               # Open agent files in $EDITOR
-  archive.go            # Archive to nark, clean scratch
+  archive.go            # Archive to nark, truncate log, clean scratch
   migrate.go            # v0.x → v1.0 migration
   version.go            # Version info
   update.go             # Self-update
