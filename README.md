@@ -39,10 +39,16 @@ cubit archive
 | Command | Description |
 |---------|-------------|
 | `cubit init <agent>` | Scaffold agent workspace at `~/.ark/agents-home/<agent>/` |
-| `cubit status` | Show goals, memory token count, log tail |
+| `cubit status` | Show goals, memory token count, projects, log tail |
 | `cubit edit <target>` | Open agent file in `$EDITOR` (goals, memory, program, fluctlight, settings) |
 | `cubit archive` | Push log + scratch to nark, truncate log, clean scratch |
+| `cubit project new <name>` | Create a new project with git init |
+| `cubit project list` | List all projects with commit count and last activity |
+| `cubit project search <query>` | Search across all project repos |
+| `cubit project archive <name>` | Archive a project to nark |
+| `cubit project status <name>` | Show detailed project status |
 | `cubit migrate [agents...]` | Migrate workspaces to agents-home layout |
+| `cubit migrate-projects [agents...]` | Migrate git-at-root workspaces to projects/ layout |
 | `cubit version` | Show version info |
 | `cubit update` | Self-update from GitHub releases |
 
@@ -63,12 +69,10 @@ cubit archive --keep-log 100   # keep last 100 log lines instead
 
 ## Agent Workspace Layout
 
-Each agent workspace is a git repo under `~/.ark/agents-home/`:
+Each agent workspace is a plain directory under `~/.ark/agents-home/`. Git repos live inside `projects/`:
 
 ```
 ~/.ark/agents-home/<agent>/
-├── .git/
-├── .gitignore
 ├── .claude/
 │   ├── settings.json          # agent-specific permissions (user-editable)
 │   └── agents/
@@ -78,8 +82,14 @@ Each agent workspace is a git repo under `~/.ark/agents-home/`:
 ├── GOALS.md                   # what to work on (agent removes completed)
 ├── MEMORY.md                  # working context (agent-maintained)
 ├── log.md                     # append-only accomplishment history
-└── scratch/                   # ephemeral workspace
-    └── <task-name>/           # one dir per task
+├── scratch/                   # ephemeral workspace
+│   └── <task-name>/           # one dir per task
+└── projects/                  # persistent versioned work
+    ├── market-trends-q1/      # git repo
+    │   ├── .git/
+    │   ├── EVAL.md            # optional: evaluation rules
+    │   └── <work files>
+    └── trading-strategy/      # git repo
 ```
 
 ## Config
@@ -91,7 +101,9 @@ agent: noah
 root: ~/.ark
 ```
 
-## Migration from v0.x
+## Migration
+
+### From v0.x or flat v1.0
 
 Supports migrating from v0.x (`~/.ark/cubit/<agent>/`) or flat v1.0 (`~/.ark/<agent>/`):
 
@@ -102,6 +114,17 @@ cubit migrate               # migrate the default agent from config
 
 Flat v1.0 workspaces are moved directly. V0.x workspaces are scaffolded fresh with data copied over and old directories backed up.
 
+### From git-at-root to projects/ layout
+
+Workspaces created by older versions of `cubit init` have `.git` at the workspace root. To transition to the new model where only projects are git repos:
+
+```bash
+cubit migrate-projects noah    # migrate specific agents
+cubit migrate-projects         # migrate the default agent
+```
+
+This moves `.git` into `projects/legacy/` (preserving history) or removes it if there are no commits. Workspace files (GOALS.md, MEMORY.md, etc.) are not moved.
+
 ## Project Layout
 
 ```
@@ -111,12 +134,15 @@ cmd/                    # Cobra commands
   status.go             # Show workspace status
   edit.go               # Open agent files in $EDITOR
   archive.go            # Archive to nark, truncate log, clean scratch
+  project.go            # Project management subcommands
   migrate.go            # v0.x → v1.0 migration
+  migrate_projects.go   # git-at-root → projects/ migration
   version.go            # Version info
   update.go             # Self-update
 internal/
   config/               # Config types + Viper loading
   scaffold/             # Agent workspace scaffolding
+  project/              # Project CRUD, search, git operations
   updater/              # Self-update from GitHub releases
 main.go                 # Entry point
 ```

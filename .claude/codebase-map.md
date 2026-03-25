@@ -21,17 +21,21 @@ cubit/
 │   ├── version.go           # `cubit version` — prints version/commit/date
 │   ├── update.go            # `cubit update` — self-update from GitHub releases
 │   ├── init.go              # `cubit init` — scaffold agent workspace
-│   ├── status.go            # `cubit status` — goals, memory tokens, log tail
+│   ├── status.go            # `cubit status` — goals, memory tokens, projects, log tail
 │   ├── edit.go              # `cubit edit` — open agent files in $EDITOR
 │   ├── archive.go           # `cubit archive` — log + scratch → nark, truncate log, clean scratch
-│   └── migrate.go           # `cubit migrate` — v0.x → v1.0 workspace migration
+│   ├── project.go           # `cubit project` — new/list/search/archive/status subcommands
+│   ├── migrate.go           # `cubit migrate` — v0.x → v1.0 workspace migration
+│   └── migrate_projects.go  # `cubit migrate-projects` — git-at-root → projects/ migration
 ├── internal/
 │   ├── config/
 │   │   ├── config.go        # Config struct, Load(), Default(), AgentDir(), IsLegacyLayout()
 │   │   └── config_test.go   # Tests for config
 │   ├── scaffold/
-│   │   ├── scaffold.go      # Init() — creates agent workspace with git, .claude/, templates
+│   │   ├── scaffold.go      # Init() — creates agent workspace with .claude/, templates, projects/
 │   │   └── scaffold_test.go # Tests for scaffold
+│   ├── project/
+│   │   └── project.go       # New(), List(), Search(), Archive(), Status() — project CRUD + git ops
 │   └── updater/
 │       ├── updater.go       # Update() — self-update via GitHub releases API
 │       └── updater_test.go  # Tests for updater
@@ -54,7 +58,12 @@ cubit/
 ### `internal/scaffold`
 | File | Exports / Responsibility |
 |------|--------------------------|
-| `scaffold.go` | `Init(root, agent, force)` — creates agent dir with git init, .claude/settings.json, .claude/agents/<agent>.md, template files (FLUCTLIGHT, PROGRAM, GOALS, MEMORY, log), scratch/, .gitignore, config.yaml |
+| `scaffold.go` | `Init(root, agent, force)` — creates agent dir with .claude/settings.json, .claude/agents/<agent>.md, template files (FLUCTLIGHT, PROGRAM, GOALS, MEMORY, log), scratch/, projects/, config.yaml |
+
+### `internal/project`
+| File | Exports / Responsibility |
+|------|--------------------------|
+| `project.go` | `New()`, `List()`, `Search()`, `Archive()`, `Status()`, `FormatAge()` — project CRUD, git-based search across projects, nark archival |
 
 ### `internal/updater`
 | File | Exports / Responsibility |
@@ -67,8 +76,10 @@ main.go → cmd/
   cmd/root.go → internal/config
   cmd/init.go → internal/scaffold
   cmd/migrate.go → internal/scaffold
+  cmd/migrate_projects.go → (os/exec for git)
+  cmd/project.go → internal/project
+  cmd/status.go → internal/project
   cmd/update.go → internal/updater
-  cmd/status.go → (filesystem only)
   cmd/edit.go → (os/exec only)
   cmd/archive.go → (os/exec for nark)
 

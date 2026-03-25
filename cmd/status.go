@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/SeanoChang/cubit/internal/project"
 	"github.com/spf13/cobra"
 )
 
@@ -42,6 +43,21 @@ var statusCmd = &cobra.Command{
 			tokens := int(float64(words) * 1.3)
 			fmt.Printf("Memory: ~%d tokens (%d words)\n", tokens, words)
 		}
+
+		// Projects
+		projects, projErr := project.List(agentDir)
+		if projErr == nil && len(projects) > 0 {
+			fmt.Printf("\nProjects (%d):\n", len(projects))
+			for _, p := range projects {
+				age := project.FormatAge(p.LastCommit)
+				extra := ""
+				if p.HasEval {
+					extra = " [EVAL]"
+				}
+				fmt.Printf("  %-25s %3d commits, last: %-8s%s\n", p.Name, p.CommitCount, age, extra)
+			}
+		}
+		fmt.Println()
 
 		// log.md tail
 		logPath := filepath.Join(agentDir, "log.md")

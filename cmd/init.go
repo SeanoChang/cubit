@@ -105,7 +105,8 @@ func interactiveSetup(agentDir, agent string, identityImported bool) error {
 
 	fmt.Println("\n--- Interactive Setup (powered by Claude) ---")
 	fmt.Println("Claude will interview you to build each file.")
-	fmt.Println("Type !skip to skip a file, !skip-all to skip remaining.\n")
+	fmt.Println("Type !skip to skip a file, !skip-all to skip remaining.")
+	fmt.Println()
 
 	targets := setupTargets
 	if identityImported {

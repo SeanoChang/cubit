@@ -3,7 +3,6 @@ package scaffold
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/SeanoChang/cubit/internal/config"
@@ -25,6 +24,7 @@ func Init(root, agent string, force bool) (bool, error) {
 	// Directories
 	dirs := []string{
 		filepath.Join(agentDir, "scratch"),
+		filepath.Join(agentDir, "projects"),
 		filepath.Join(agentDir, ".claude", "agents"),
 	}
 	for _, d := range dirs {
@@ -40,8 +40,6 @@ func Init(root, agent string, force bool) (bool, error) {
 		filepath.Join(agentDir, "GOALS.md"):  "# Goals\n\n<!-- Add goals here. Agent removes completed goals. -->\n",
 		filepath.Join(agentDir, "MEMORY.md"): "# Memory\n\n<!-- Agent-maintained working context. Updated between sessions. -->\n",
 		filepath.Join(agentDir, "log.md"):    "# Log\n",
-		filepath.Join(agentDir, "scratch", ".gitkeep"): "",
-		filepath.Join(agentDir, ".gitignore"): "scratch/*\n!scratch/.gitkeep\n",
 	}
 	for path, content := range files {
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
@@ -98,26 +96,21 @@ tools: Agent, Read, Write, Edit, Bash, Grep, Glob
 1. Read ~/.ark/agents-home/%s/FLUCTLIGHT.md — this is your identity. Never modify it.
 2. Read ~/.ark/agents-home/%s/GOALS.md — these are your current objectives.
 3. Read ~/.ark/agents-home/%s/MEMORY.md — this is your working context from previous sessions.
-4. Work on the highest-priority incomplete goal.
-5. Use subagents for parallel research or independent subtasks.
-6. When you complete meaningful work:
+4. Check INBOX.md — handle any priority items before starting goals.
+5. For each goal, determine if it relates to an existing project:
+   - Run `+"`cubit project search <keywords>`"+` to find related work
+   - If found: cd into the project directory, review recent commits, continue
+   - If not found: run `+"`cubit project new <name>`"+` to create a fresh project
+6. Work in the project directory. Commit at natural checkpoints.
+7. When you complete meaningful work:
    - Update MEMORY.md with current state
    - Append a one-line summary to log.md
    - If a goal is fully complete, remove it from GOALS.md
-7. Write working files to scratch/<task-name>/.
+8. Write deliverables to DELIVER.md.
 `, agent, agent, agent, agent)
 	agentMDPath := filepath.Join(agentDir, ".claude", "agents", agent+".md")
 	if err := os.WriteFile(agentMDPath, []byte(agentMD), 0o644); err != nil {
 		return false, err
-	}
-
-	// git init
-	cmd := exec.Command("git", "init")
-	cmd.Dir = agentDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return false, fmt.Errorf("git init: %w", err)
 	}
 
 	// Write config.yaml at root if it doesn't exist

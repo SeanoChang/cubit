@@ -13,9 +13,10 @@ go build -o cubit .
 
 ## Project Layout
 
-- `cmd/` — Cobra root + commands (init, migrate, status, edit, archive, version, update)
+- `cmd/` — Cobra root + commands (init, migrate, migrate-projects, status, edit, archive, project, version, update)
 - `internal/config/` — Config types + loading via Viper
 - `internal/scaffold/` — Agent workspace scaffolding
+- `internal/project/` — Project CRUD, search, git operations
 - `internal/updater/` — GitHub release self-updater
 - `main.go` — Entry point
 
@@ -24,6 +25,7 @@ go build -o cubit .
 - Module: `github.com/SeanoChang/cubit`
 - Config file: `~/.ark/config.yaml`
 - Agent data: `~/.ark/agents-home/<agent>/` (e.g. `~/.ark/agents-home/noah/`)
-- Each agent dir is a git repo with `.claude/` config
+- Agent dirs are plain directories (not git repos); git repos live in `projects/` subdirectories
+- Each agent dir has `.claude/` config
 - Version injected via ldflags at build time
 - Release targets: linux/amd64 + darwin/arm64

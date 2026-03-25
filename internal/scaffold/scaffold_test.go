@@ -24,6 +24,7 @@ func TestInit(t *testing.T) {
 	// Check directories exist
 	dirs := []string{
 		"scratch",
+		"projects",
 		".claude",
 		".claude/agents",
 	}
@@ -46,7 +47,6 @@ func TestInit(t *testing.T) {
 		"GOALS.md",
 		"MEMORY.md",
 		"log.md",
-		".gitignore",
 		".claude/settings.json",
 		".claude/agents/testbot.md",
 	}
@@ -57,28 +57,16 @@ func TestInit(t *testing.T) {
 		}
 	}
 
-	// Check .git/ exists (git init ran)
+	// Check .git/ does NOT exist at workspace root (no git init)
 	gitDir := filepath.Join(agentDir, ".git")
-	if _, err := os.Stat(gitDir); err != nil {
-		t.Errorf(".git/ not found — git init did not run: %v", err)
+	if _, err := os.Stat(gitDir); err == nil {
+		t.Error(".git/ should not exist at workspace root")
 	}
 
 	// Check agent.md contains agent name
 	agentMD, _ := os.ReadFile(filepath.Join(agentDir, ".claude", "agents", "testbot.md"))
 	if !strings.Contains(string(agentMD), "name: testbot") {
 		t.Error("agent.md does not contain agent name")
-	}
-
-	// Check scratch/.gitkeep exists
-	gitkeep := filepath.Join(agentDir, "scratch", ".gitkeep")
-	if _, err := os.Stat(gitkeep); err != nil {
-		t.Errorf("scratch/.gitkeep not found: %v", err)
-	}
-
-	// Check .gitignore content
-	gitignore, _ := os.ReadFile(filepath.Join(agentDir, ".gitignore"))
-	if !strings.Contains(string(gitignore), "scratch/*") {
-		t.Error(".gitignore missing scratch/* pattern")
 	}
 
 	// Check settings.json has allow list
