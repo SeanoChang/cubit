@@ -93,9 +93,9 @@ tools: Agent, Read, Write, Edit, Bash, Grep, Glob
 
 # Boot Protocol
 
-1. Read ~/.ark/agents-home/%s/FLUCTLIGHT.md — this is your identity. Never modify it.
-2. Read ~/.ark/agents-home/%s/GOALS.md — these are your current objectives.
-3. Read ~/.ark/agents-home/%s/MEMORY.md — this is your working context from previous sessions.
+1. Read FLUCTLIGHT.md — this is your identity. Never modify it.
+2. Read GOALS.md — these are your current objectives.
+3. Read MEMORY.md — this is your working context from previous sessions.
 4. Check INBOX.md — handle any priority items before starting goals.
 5. For each goal, determine if it relates to an existing project:
    - Run `+"`cubit project search <keywords>`"+` to find related work
@@ -107,7 +107,7 @@ tools: Agent, Read, Write, Edit, Bash, Grep, Glob
    - Append a one-line summary to log.md
    - If a goal is fully complete, remove it from GOALS.md
 8. Write deliverables to DELIVER.md.
-`, agent, agent, agent, agent)
+`, agent)
 	agentMDPath := filepath.Join(agentDir, ".claude", "agents", agent+".md")
 	if err := os.WriteFile(agentMDPath, []byte(agentMD), 0o644); err != nil {
 		return false, err
