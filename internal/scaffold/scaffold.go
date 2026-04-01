@@ -25,6 +25,7 @@ func Init(root, agent string, force bool) (bool, error) {
 	dirs := []string{
 		filepath.Join(agentDir, "scratch"),
 		filepath.Join(agentDir, "projects"),
+		filepath.Join(agentDir, "memory"),
 		filepath.Join(agentDir, ".claude", "agents"),
 	}
 	for _, d := range dirs {

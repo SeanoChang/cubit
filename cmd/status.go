@@ -44,6 +44,19 @@ var statusCmd = &cobra.Command{
 			fmt.Printf("Memory: ~%d tokens (%d words)\n", tokens, words)
 		}
 
+		// memory/ topic files
+		memDir := filepath.Join(agentDir, "memory")
+		var topicFiles int
+		filepath.WalkDir(memDir, func(_ string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				topicFiles++
+			}
+			return nil
+		})
+		if topicFiles > 0 {
+			fmt.Printf("Topics: %d files in memory/\n", topicFiles)
+		}
+
 		// Projects
 		projects, projErr := project.List(agentDir)
 		if projErr == nil && len(projects) > 0 {

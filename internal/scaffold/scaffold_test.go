@@ -25,6 +25,7 @@ func TestInit(t *testing.T) {
 	dirs := []string{
 		"scratch",
 		"projects",
+		"memory",
 		".claude",
 		".claude/agents",
 	}

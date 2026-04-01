@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -17,6 +18,8 @@ var targets = map[string]string{
 	"fluctlight": "FLUCTLIGHT.md",
 	"settings":   filepath.Join(".claude", "settings.json"),
 }
+
+const memoryDirPrefix = "memory/"
 
 var editCmd = &cobra.Command{
 	Use:   "edit <target> [content]",
@@ -41,12 +44,36 @@ Requires --agent <name> when not inside an agent directory.`,
 			return fmt.Errorf("agent not specified — use --agent <name> or run from inside an agent directory")
 		}
 
-		filename, ok := targets[args[0]]
+		target := args[0]
+		filename, ok := targets[target]
+		if !ok && strings.HasPrefix(target, memoryDirPrefix) {
+			// memory/<path> → memory/<path>.md
+			sub := strings.TrimPrefix(target, memoryDirPrefix)
+			if sub == "" {
+				return fmt.Errorf("missing path after memory/ — use: cubit edit memory/<topic>")
+			}
+			sub = filepath.Clean(sub)
+			if strings.HasPrefix(sub, "..") || filepath.IsAbs(sub) {
+				return fmt.Errorf("invalid memory path %q — must be relative within memory/", sub)
+			}
+			if !strings.HasSuffix(sub, ".md") {
+				sub += ".md"
+			}
+			filename = filepath.Join("memory", sub)
+			ok = true
+		}
 		if !ok {
-			return fmt.Errorf("unknown target %q — use: goals, memory, program, fluctlight, settings", args[0])
+			return fmt.Errorf("unknown target %q — use: goals, memory, memory/<topic>, program, fluctlight, settings", target)
 		}
 
 		path := filepath.Join(cfg.AgentDir(), filename)
+
+		// Ensure parent directory exists for nested memory paths
+		if strings.HasPrefix(target, memoryDirPrefix) {
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return fmt.Errorf("creating directory: %w", err)
+			}
+		}
 		append, _ := cmd.Flags().GetBool("append")
 
 		// Mode 1: content as argument
