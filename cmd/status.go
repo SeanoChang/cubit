@@ -47,10 +47,15 @@ var statusCmd = &cobra.Command{
 		// memory/ topic files
 		memDir := filepath.Join(agentDir, "memory")
 		var topicFiles int
-		filepath.WalkDir(memDir, func(_ string, d os.DirEntry, err error) error {
-			if err == nil && !d.IsDir() {
-				topicFiles++
+		filepath.WalkDir(memDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
 			}
+			rel, _ := filepath.Rel(memDir, path)
+			if strings.HasPrefix(rel, "archive/") || strings.HasPrefix(rel, "archive\\") {
+				return nil
+			}
+			topicFiles++
 			return nil
 		})
 		if topicFiles > 0 {

@@ -32,6 +32,10 @@ var memoryLsCmd = &cobra.Command{
 			if err != nil || d.IsDir() {
 				return nil
 			}
+			rel, _ := filepath.Rel(memDir, path)
+			if strings.HasPrefix(rel, "archive/") || strings.HasPrefix(rel, "archive\\") {
+				return nil
+			}
 			data, readErr := os.ReadFile(path)
 			if readErr != nil {
 				return nil
@@ -40,7 +44,6 @@ var memoryLsCmd = &cobra.Command{
 			if len(data) == 0 {
 				lines = 0
 			}
-			rel, _ := filepath.Rel(memDir, path)
 			fmt.Printf("  %-35s %4d lines\n", rel, lines)
 			totalFiles++
 			totalLines += lines
@@ -89,6 +92,10 @@ var memoryCheckCmd = &cobra.Command{
 
 		filepath.WalkDir(memDir, func(path string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
+				return nil
+			}
+			rel, _ := filepath.Rel(memDir, path)
+			if strings.HasPrefix(rel, "archive/") || strings.HasPrefix(rel, "archive\\") {
 				return nil
 			}
 			info, infoErr := d.Info()

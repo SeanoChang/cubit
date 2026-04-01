@@ -69,6 +69,7 @@ func init() {
 	rootCmd.AddCommand(migrateProjectsCmd)
 	rootCmd.AddCommand(memoryCmd)
 	rootCmd.AddCommand(migrateMemoryCmd)
+	rootCmd.AddCommand(dreamCmd)
 }
 
 // detectAgentFromCWD checks if the current directory is inside agents-home/<agent>/
