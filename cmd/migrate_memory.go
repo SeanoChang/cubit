@@ -23,6 +23,10 @@ Examples:
 		}
 
 		for _, agent := range agents {
+			if !isValidAgentName(agent) {
+				fmt.Fprintf(os.Stderr, "%s: invalid agent name\n", agent)
+				continue
+			}
 			agentDir := filepath.Join(cfg.Root, "agents-home", agent)
 			if _, err := os.Stat(agentDir); os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "%s: agent workspace not found at %s\n", agent, agentDir)

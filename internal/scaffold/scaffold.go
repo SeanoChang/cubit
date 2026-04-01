@@ -26,6 +26,13 @@ func Init(root, agent string, force bool) (bool, error) {
 		filepath.Join(agentDir, "scratch"),
 		filepath.Join(agentDir, "projects"),
 		filepath.Join(agentDir, "memory"),
+		filepath.Join(agentDir, "mailbox", "inbox", "important"),
+		filepath.Join(agentDir, "mailbox", "inbox", "priority"),
+		filepath.Join(agentDir, "mailbox", "inbox", "all"),
+		filepath.Join(agentDir, "mailbox", "starred"),
+		filepath.Join(agentDir, "mailbox", "drafts"),
+		filepath.Join(agentDir, "mailbox", "sent"),
+		filepath.Join(agentDir, "mailbox", "read"),
 		filepath.Join(agentDir, ".claude", "agents"),
 	}
 	for _, d := range dirs {
@@ -97,7 +104,7 @@ tools: Agent, Read, Write, Edit, Bash, Grep, Glob
 1. Read FLUCTLIGHT.md — this is your identity. Never modify it.
 2. Read GOALS.md — these are your current objectives.
 3. Read MEMORY.md — this is your working context from previous sessions.
-4. Check INBOX.md — handle any priority items before starting goals.
+4. Check mailbox: list mailbox/inbox/ for unread messages. Triage — add actionable items to GOALS.md, move to mailbox/starred/ or mailbox/read/.
 5. For each goal, determine if it relates to an existing project:
    - Run `+"`cubit project search <keywords>`"+` to find related work
    - If found: cd into the project directory, review recent commits, continue

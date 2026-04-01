@@ -26,6 +26,13 @@ func TestInit(t *testing.T) {
 		"scratch",
 		"projects",
 		"memory",
+		"mailbox/inbox/important",
+		"mailbox/inbox/priority",
+		"mailbox/inbox/all",
+		"mailbox/starred",
+		"mailbox/drafts",
+		"mailbox/sent",
+		"mailbox/read",
 		".claude",
 		".claude/agents",
 	}

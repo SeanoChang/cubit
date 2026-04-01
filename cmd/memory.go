@@ -18,6 +18,9 @@ var memoryLsCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List memory topic files with line counts",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !agentExplicit {
+			return fmt.Errorf("agent not specified — use --agent <name> or run from inside an agent directory")
+		}
 		memDir := filepath.Join(cfg.AgentDir(), "memory")
 
 		if _, err := os.Stat(memDir); os.IsNotExist(err) {
@@ -66,6 +69,9 @@ var memoryCheckCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Show memory size stats",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !agentExplicit {
+			return fmt.Errorf("agent not specified — use --agent <name> or run from inside an agent directory")
+		}
 		agentDir := cfg.AgentDir()
 
 		// MEMORY.md stats
