@@ -46,7 +46,3 @@ Examples:
 		return nil
 	},
 }
-
-func init() {
-	// registered in root.go
-}

@@ -67,6 +67,7 @@ func init() {
 	rootCmd.AddCommand(archiveCmd)
 	rootCmd.AddCommand(projectCmd)
 	rootCmd.AddCommand(migrateProjectsCmd)
+	rootCmd.AddCommand(goalCmd)
 	rootCmd.AddCommand(memoryCmd)
 	rootCmd.AddCommand(migrateMemoryCmd)
 	rootCmd.AddCommand(dreamCmd)

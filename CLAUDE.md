@@ -13,7 +13,7 @@ go build -o cubit .
 
 ## Project Layout
 
-- `cmd/` — Cobra root + commands (init, migrate, migrate-projects, migrate-memory, status, edit, archive, project, memory, dream, version, update)
+- `cmd/` — Cobra root + commands (init, migrate, migrate-projects, migrate-memory, status, edit, archive, project, goal, memory, dream, version, update)
 - `internal/config/` — Config types + loading via Viper
 - `internal/scaffold/` — Agent workspace scaffolding
 - `internal/project/` — Project CRUD, search, git operations
