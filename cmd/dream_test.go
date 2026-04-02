@@ -1,165 +1,65 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
+	"sort"
 	"testing"
 )
 
-func TestParseDreamOutput(t *testing.T) {
+func TestLineCount(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		wantLen  int
-		wantPaths []string
+		input string
+		want  int
 	}{
-		{
-			name: "normal multi-file output",
-			input: `FILE: MEMORY.md
-# Memory Index
-- [Architecture](memory/architecture.md) — system design
-
-FILE: memory/architecture.md
-# Architecture
-Details here.
-`,
-			wantLen:   2,
-			wantPaths: []string{"MEMORY.md", "memory/architecture.md"},
-		},
-		{
-			name: "path traversal blocked",
-			input: `FILE: MEMORY.md
-# Index
-
-FILE: memory/../../etc/passwd
-bad content
-
-FILE: ../secret.md
-more bad content
-`,
-			wantLen:   1,
-			wantPaths: []string{"MEMORY.md"},
-		},
-		{
-			name: "absolute path blocked",
-			input: `FILE: MEMORY.md
-# Index
-
-FILE: /etc/passwd
-bad content
-`,
-			wantLen:   1,
-			wantPaths: []string{"MEMORY.md"},
-		},
-		{
-			name: "memory/archive/ write blocked",
-			input: `FILE: MEMORY.md
-# Index
-
-FILE: memory/archive/sneaky.md
-overwrite archive
-`,
-			wantLen:   1,
-			wantPaths: []string{"MEMORY.md"},
-		},
-		{
-			name: "non-memory path blocked",
-			input: `FILE: MEMORY.md
-# Index
-
-FILE: GOALS.md
-overwrite goals
-
-FILE: .claude/settings.json
-overwrite settings
-`,
-			wantLen:   1,
-			wantPaths: []string{"MEMORY.md"},
-		},
-		{
-			name:      "empty output",
-			input:     "",
-			wantLen:   0,
-			wantPaths: nil,
-		},
-		{
-			name: "no MEMORY.md in output",
-			input: `FILE: memory/topic.md
-some content
-`,
-			wantLen:   1,
-			wantPaths: []string{"memory/topic.md"},
-		},
-		{
-			name: "nested memory path allowed",
-			input: `FILE: MEMORY.md
-# Index
-
-FILE: memory/projects/trading-system.md
-# Trading System
-Details.
-`,
-			wantLen:   2,
-			wantPaths: []string{"MEMORY.md", "memory/projects/trading-system.md"},
-		},
-		{
-			name: "preamble text before first FILE marker ignored",
-			input: `Here is the consolidated memory:
-
-FILE: MEMORY.md
-# Index
-`,
-			wantLen:   1,
-			wantPaths: []string{"MEMORY.md"},
-		},
+		{"one line", 1},
+		{"line1\nline2\nline3", 3},
+		{"line1\nline2\n", 2},
+		{"", 1},
 	}
-
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			files := parseDreamOutput(tt.input)
-
-			if len(files) != tt.wantLen {
-				t.Fatalf("got %d files, want %d", len(files), tt.wantLen)
-			}
-
-			for i, wantPath := range tt.wantPaths {
-				if files[i].path != wantPath {
-					t.Errorf("file[%d].path = %q, want %q", i, files[i].path, wantPath)
-				}
-			}
-		})
+		got := lineCount(tt.input)
+		if got != tt.want {
+			t.Errorf("lineCount(%q) = %d, want %d", tt.input, got, tt.want)
+		}
 	}
 }
 
-func TestParseDreamOutputContent(t *testing.T) {
-	input := `FILE: MEMORY.md
-# Memory Index
-- [Topic](memory/topic.md) — description
+func TestListTopicFiles(t *testing.T) {
+	tmp := t.TempDir()
 
-FILE: memory/topic.md
-# Topic
-Line 1.
-Line 2.
-`
+	// Create topic files
+	os.WriteFile(filepath.Join(tmp, "architecture.md"), []byte("# Arch"), 0o644)
+	os.WriteFile(filepath.Join(tmp, "decisions.md"), []byte("# Decisions"), 0o644)
 
-	files := parseDreamOutput(input)
-	if len(files) != 2 {
-		t.Fatalf("got %d files, want 2", len(files))
-	}
+	// Create archive/ — should be excluded
+	archiveDir := filepath.Join(tmp, "archive")
+	os.MkdirAll(archiveDir, 0o755)
+	os.WriteFile(filepath.Join(archiveDir, "2026-01-01.md"), []byte("old"), 0o644)
 
-	// Check MEMORY.md content
-	if files[0].path != "MEMORY.md" {
-		t.Errorf("file[0].path = %q, want MEMORY.md", files[0].path)
-	}
-	wantIndex := "# Memory Index\n- [Topic](memory/topic.md) — description\n"
-	if files[0].content != wantIndex {
-		t.Errorf("file[0].content = %q, want %q", files[0].content, wantIndex)
-	}
+	got := listTopicFiles(tmp)
+	sort.Strings(got)
 
-	// Check topic file content
-	if files[1].path != "memory/topic.md" {
-		t.Errorf("file[1].path = %q, want memory/topic.md", files[1].path)
+	want := []string{
+		filepath.Join(tmp, "architecture.md"),
+		filepath.Join(tmp, "decisions.md"),
 	}
-	wantTopic := "# Topic\nLine 1.\nLine 2.\n"
-	if files[1].content != wantTopic {
-		t.Errorf("file[1].content = %q, want %q", files[1].content, wantTopic)
+	sort.Strings(want)
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d files, want %d: %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("file[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestListTopicFilesEmpty(t *testing.T) {
+	tmp := t.TempDir()
+	got := listTopicFiles(tmp)
+	if len(got) != 0 {
+		t.Errorf("expected 0 files, got %d", len(got))
 	}
 }
