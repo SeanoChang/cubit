@@ -138,7 +138,7 @@ Examples:
 
 		// Invoke claude
 		var stderr strings.Builder
-		claude := exec.Command("claude", "-p", prompt)
+		claude := exec.Command("claude", "-p", "--output-format", "text", prompt)
 		claude.Dir = agentDir
 		claude.Stderr = &stderr
 		output, err := claude.Output()
@@ -155,7 +155,11 @@ Examples:
 		// Parse output into files
 		files := parseDreamOutput(result)
 		if len(files) == 0 {
-			return fmt.Errorf("consolidation produced no files — something went wrong")
+			preview := result
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+			return fmt.Errorf("consolidation produced no parseable files (expected FILE: markers)\nClaude output preview:\n%s", preview)
 		}
 
 		// Check we got a MEMORY.md in the output
