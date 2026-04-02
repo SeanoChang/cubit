@@ -47,8 +47,16 @@ cubit archive
 | `cubit project search <query>` | Search across all project repos |
 | `cubit project archive <name>` | Archive a project to nark |
 | `cubit project status <name>` | Show detailed project status |
+| `cubit goal add <message>` | Add a typed goal to GOALS.md |
+| `cubit goal ls` | List current goals with type tags |
+| `cubit memory ls` | List memory topic files with line counts |
+| `cubit memory check` | Show memory size stats (MEMORY.md + memory/) |
+| `cubit dream` | LLM-powered memory consolidation into index + topic files |
+| `cubit send <draft-file>` | Send a mailbox message to another agent |
 | `cubit migrate [agents...]` | Migrate workspaces to agents-home layout |
 | `cubit migrate-projects [agents...]` | Migrate git-at-root workspaces to projects/ layout |
+| `cubit migrate-memory [agents...]` | Create memory/ directory for existing agents |
+| `cubit migrate-mailbox [agents...]` | Create mailbox/ tree, migrate INBOX.md |
 | `cubit version` | Show version info |
 | `cubit update` | Self-update from GitHub releases |
 
@@ -58,6 +66,45 @@ cubit archive
 cubit init noah                          # scaffold new workspace
 cubit init noah --force                  # re-initialize existing workspace
 cubit init noah --import-identity id.md  # import an existing FLUCTLIGHT.md
+```
+
+### Goal Flags
+
+```bash
+cubit goal add "research market trends"                  # session goal (default)
+cubit goal add --type background "check disk usage"      # background goal
+cubit goal add --type consolidation "reorganize memory"  # consolidation goal
+cubit goal add --from alice "review PR #42"              # set source
+cubit goal ls                                            # list all goals
+cubit goal ls --type background                          # filter by type
+```
+
+### Dream Flags
+
+```bash
+cubit dream                    # consolidate memory with Claude
+cubit dream --dry-run          # show what would change without applying
+cubit dream --include-log      # include log.md for temporal context
+```
+
+### Send
+
+```bash
+cubit send mailbox/drafts/my-message.md   # send a draft message
+```
+
+Draft files use YAML frontmatter:
+
+```yaml
+---
+from: alice
+to: noah
+subject: Found a regression in auth module
+category: important    # important | priority | all (default: all)
+type: notification     # notification | request | handoff
+---
+
+Body of the message here.
 ```
 
 ### Archive Flags
@@ -82,6 +129,18 @@ Each agent workspace is a plain directory under `~/.ark/agents-home/`. Git repos
 ├── GOALS.md                   # what to work on (agent removes completed)
 ├── MEMORY.md                  # working context (agent-maintained)
 ├── log.md                     # append-only accomplishment history
+├── memory/                    # topic-based memory files (agent-maintained)
+│   ├── <topic>.md             # e.g., architecture.md, decisions.md
+│   └── archive/               # archived MEMORY.md snapshots from dream
+├── mailbox/                   # inter-agent messaging
+│   ├── inbox/
+│   │   ├── important/         # high-priority messages
+│   │   ├── priority/          # medium-priority messages
+│   │   └── all/               # default category
+│   ├── starred/               # starred messages
+│   ├── drafts/                # outgoing drafts
+│   ├── sent/                  # sent message copies
+│   └── read/                  # processed messages
 ├── scratch/                   # ephemeral workspace
 │   └── <task-name>/           # one dir per task
 └── projects/                  # persistent versioned work
@@ -130,13 +189,20 @@ This moves `.git` into `projects/legacy/` (preserving history) or removes it if 
 ```
 cmd/                    # Cobra commands
   root.go               # Root command, wires all subcommands
+  helpers.go            # Shared utils (isValidAgentName)
   init.go               # Scaffold new agent workspace
   status.go             # Show workspace status
   edit.go               # Open agent files in $EDITOR
   archive.go            # Archive to nark, truncate log, clean scratch
   project.go            # Project management subcommands
+  goal.go               # Typed goal management
+  memory.go             # Memory topic file listing and stats
+  dream.go              # LLM-powered memory consolidation
+  send.go               # Inter-agent mailbox messaging
   migrate.go            # v0.x → v1.0 migration
   migrate_projects.go   # git-at-root → projects/ migration
+  migrate_memory.go     # Create memory/ directory
+  migrate_mailbox.go    # Create mailbox/ tree
   version.go            # Version info
   update.go             # Self-update
 internal/
