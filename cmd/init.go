@@ -2,15 +2,33 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/SeanoChang/cubit/internal/scaffold"
 	"github.com/spf13/cobra"
 )
+
+// InitPending is the sentinel file written by cubit init --keel
+// for keel to pick up and start a Discord-based interview.
+type InitPending struct {
+	Agent          string `json:"agent"`
+	RequestedAt    string `json:"requested_at"`
+	ImportIdentity bool   `json:"import_identity"`
+}
+
+func writeInitPending(agentDir string, p InitPending) error {
+	data, err := json.MarshalIndent(p, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(agentDir, ".init-pending"), data, 0o644)
+}
 
 var initCmd = &cobra.Command{
 	Use:   "init [agent_name]",
@@ -65,6 +83,21 @@ var initCmd = &cobra.Command{
 			fmt.Printf("  imported %s → FLUCTLIGHT.md\n", importPath)
 		}
 
+		// --keel: write sentinel and exit, let keel handle the interview via Discord
+		keelMode, _ := cmd.Flags().GetBool("keel")
+		if keelMode {
+			pending := InitPending{
+				Agent:          agent,
+				RequestedAt:    time.Now().UTC().Format(time.RFC3339),
+				ImportIdentity: importPath != "",
+			}
+			if err := writeInitPending(agentDir, pending); err != nil {
+				return fmt.Errorf("writing .init-pending: %w", err)
+			}
+			fmt.Println("Agent scaffolded. Continue setup in Discord setup channel.")
+			return nil
+		}
+
 		// Interactive setup via claude -p
 		skipSetup, _ := cmd.Flags().GetBool("skip-setup")
 		if !skipSetup && isTerminal() {
@@ -82,6 +115,7 @@ func init() {
 	initCmd.Flags().String("import-identity", "", "Import an existing FLUCTLIGHT.md file")
 	initCmd.Flags().Bool("force", false, "Re-initialize an existing agent workspace")
 	initCmd.Flags().Bool("skip-setup", false, "Skip interactive setup with Claude")
+	initCmd.Flags().Bool("keel", false, "Signal keel for Discord-based setup instead of terminal interview")
 }
 
 const maxInterviewRounds = 5
