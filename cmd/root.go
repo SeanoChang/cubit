@@ -72,6 +72,8 @@ func init() {
 	rootCmd.AddCommand(migrateMemoryCmd)
 	rootCmd.AddCommand(dreamCmd)
 	rootCmd.AddCommand(sendCmd)
+	rootCmd.AddCommand(delegateCmd)
+	rootCmd.AddCommand(respondCmd)
 	rootCmd.AddCommand(migrateMailboxCmd)
 }
 

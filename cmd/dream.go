@@ -11,11 +11,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const dreamPrompt = `Consolidate this agent's MEMORY.md into memory/ topic files.
+const dreamPrompt = `Consolidate this agent's memory.
 
-Read MEMORY.md, break it into topic files under memory/, and update MEMORY.md as an index pointing to them. Organize however you see fit. All topic files must be in memory/.
+## Workspace Structure
 
-Do NOT touch memory/archive/.`
+This is a cubit agent workspace. Each file has a specific role:
+
+- FLUCTLIGHT.md — agent identity, role, personality, core preferences. NOT your concern.
+- PROGRAM.md — agent instructions and behavior. NOT your concern.
+- GOALS.md — current objectives. NOT your concern.
+- MEMORY.md — index pointing to memory/ topic files.
+- memory/ — topic files with working context from previous sessions.
+- log.md — session log. NOT your concern.
+
+## What To Do
+
+Read MEMORY.md and everything in memory/ (skip memory/archive/).
+
+Reorganize into clean topic files under memory/ and rewrite MEMORY.md as an index.
+
+memory/ should contain past work context: project state, technical decisions, things learned, session history, detailed preferences. If something belongs in FLUCTLIGHT.md (identity, core user preferences) or GOALS.md (active objectives), don't duplicate it in memory/.
+
+Organize however you see fit. All topic files must live in memory/.
+
+Do NOT touch memory/archive/, FLUCTLIGHT.md, PROGRAM.md, GOALS.md, or log.md.`
 
 const dreamDryRunSuffix = `
 

@@ -33,6 +33,8 @@ func Init(root, agent string, force bool) (bool, error) {
 		filepath.Join(agentDir, "mailbox", "drafts"),
 		filepath.Join(agentDir, "mailbox", "sent"),
 		filepath.Join(agentDir, "mailbox", "read"),
+		filepath.Join(agentDir, "mailbox", "delegations", "active"),
+		filepath.Join(agentDir, "mailbox", "delegations", "done"),
 		filepath.Join(agentDir, ".claude", "agents"),
 	}
 	for _, d := range dirs {
